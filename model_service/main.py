@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
     state.clear()
 
 
-app = FastAPI(title="GridironIQ model service", lifespan=lifespan)
+app = FastAPI(title="Fantasy Football Toolkit model service", lifespan=lifespan)
 
 
 @app.get("/health")

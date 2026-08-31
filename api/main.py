@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="GridironIQ",
+    title="Fantasy Football Toolkit",
     description="A trained model makes the projection; the LLM only explains it.",
     lifespan=lifespan,
 )

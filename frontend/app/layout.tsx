@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GridironIQ — start/sit",
+  title: "Fantasy Football Toolkit — start/sit",
   description:
     "Fantasy football projections from a trained sequence model, explained by an LLM grounded in retrieved news.",
 };

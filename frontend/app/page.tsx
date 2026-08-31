@@ -93,7 +93,7 @@ export default function Page() {
   return (
     <main>
       <header>
-        <h1>GridironIQ</h1>
+        <h1>Fantasy Football Toolkit</h1>
         <p>
           The projection comes from a trained sequence model — not from the
           language model. The LLM only explains the number, grounded in

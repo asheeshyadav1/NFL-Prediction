@@ -1,4 +1,4 @@
-# GridironIQ — Fantasy Football Projections That Explain Themselves
+# Fantasy Football Toolkit — Projections That Explain Themselves
 
 > A weekly NFL fantasy-points projection engine where a **trained model** makes the
 > predictions and an **LLM only explains them** — grounded in injury and news data
