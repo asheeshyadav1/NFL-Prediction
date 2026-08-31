@@ -1,0 +1,30 @@
+# Model service: holds the weights, serves projections. Its own image because it
+# has the heaviest dependency (torch) and the largest memory footprint.
+FROM python:3.12-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Requirements first so the dependency layer caches across code changes.
+COPY requirements-model.txt .
+RUN pip install --no-cache-dir -r requirements-model.txt
+
+COPY model/ ./model/
+COPY api/__init__.py api/feature_store.py api/inference.py api/schemas.py ./api/
+COPY model_service/ ./model_service/
+
+# Trained weights are baked into the image so the container has no external
+# dependency at startup. Run `python model/train.py` before building.
+COPY model/artifacts/projection_net.pt ./model/artifacts/projection_net.pt
+
+RUN useradd --create-home --uid 10001 app && chown -R app:app /app
+USER app
+
+EXPOSE 8001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s \
+  CMD python -c "import urllib.request;urllib.request.urlopen('http://localhost:8001/health')"
+
+CMD ["uvicorn", "model_service.main:app", "--host", "0.0.0.0", "--port", "8001"]

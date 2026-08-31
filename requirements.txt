@@ -1,0 +1,6 @@
+# Everything, for local development and training. The container images install
+# the per-service subsets instead:
+#   requirements-model.txt  -- model service (torch, CPU wheels)
+#   requirements-api.txt    -- API gateway (no torch)
+-r requirements-model.txt
+-r requirements-api.txt

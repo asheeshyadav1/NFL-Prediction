@@ -1,0 +1,85 @@
+# API gateway: retrieval + narration. Stateless and light (no torch), so it
+# scales out cheaply and independently of the model service.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: api
+    component: gateway
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+        component: gateway
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: api
+          image: ghcr.io/OWNER/gridiron-api:latest
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            # This is what splits the services: with it set, the gateway calls
+            # the model service instead of loading the model itself.
+            - name: MODEL_SERVICE_URL
+              value: "http://model-service:8001"
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gridiron-secrets
+                  key: anthropic-api-key
+                  optional: true   # falls back to the template narrator
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: gridiron-secrets
+                  key: database-url
+                  optional: true   # falls back to in-memory retrieval
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+          readinessProbe:
+            # Returns 503 while the model service is unreachable, so a gateway
+            # that cannot serve a projection is taken out of rotation.
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            # Liveness must not depend on a downstream dependency, so failures
+            # are tolerated for longer here than on the readiness probe.
+            failureThreshold: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 8000
+      targetPort: http
+      name: http

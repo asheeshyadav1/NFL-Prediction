@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/raw/
+.git/
+.github/
+# Node build output is excluded, but frontend/ itself must stay in the build
+# context -- Dockerfile.frontend copies it. The Python images never COPY it.
+node_modules/
+.next/

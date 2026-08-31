@@ -1,0 +1,79 @@
+# The model service gets its own Deployment.
+#
+# It loads model weights and the feature frame into memory, so it wants
+# materially more RAM than the gateway and takes ~1-2 minutes to become ready.
+# It also scales on projection volume rather than web traffic. Those are three
+# independent reasons it should not share a pod with the API.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-service
+  labels:
+    app: model-service
+    component: inference
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: model-service
+  template:
+    metadata:
+      labels:
+        app: model-service
+        component: inference
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: model-service
+          image: ghcr.io/OWNER/gridiron-model:latest
+          ports:
+            - containerPort: 8001
+              name: http
+          resources:
+            # Weights plus the in-memory feature frame; the request is sized to
+            # steady state and the limit leaves room for load spikes.
+            requests:
+              memory: "1.5Gi"
+              cpu: "500m"
+            limits:
+              memory: "3Gi"
+              cpu: "2"
+          # Startup takes a while (weights + feature build), so the slow start
+          # is handled by a startupProbe rather than by loosening the liveness
+          # probe -- that way a genuinely wedged pod is still restarted quickly.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-service
+spec:
+  selector:
+    app: model-service
+  ports:
+    - port: 8001
+      targetPort: http
+      name: http

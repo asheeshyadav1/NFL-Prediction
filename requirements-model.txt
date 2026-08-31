@@ -1,0 +1,14 @@
+# Model training + inference. Installed in the model-service image.
+# CPU-only torch: this service does inference on CPU, and the default wheel
+# drags in several GB of CUDA runtime it will never use.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.13.0
+numpy==2.5.2
+pandas==3.0.5
+pyarrow==25.0.1
+scikit-learn==1.9.0
+
+# The model service is a FastAPI app too.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.5

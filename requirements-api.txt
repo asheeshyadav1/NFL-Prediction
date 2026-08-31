@@ -1,0 +1,14 @@
+# API gateway: retrieval + narration. Never loads the model, so no torch,
+# pandas, or pyarrow -- scikit-learn is here only for the hashing vectorizer.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.5
+httpx==0.28.1
+numpy==2.5.2
+scikit-learn==1.9.0
+anthropic==1.2.0
+
+# Optional: pgvector-backed retrieval. Without these the retriever falls back
+# to the in-process store, so the demo runs with no database.
+# psycopg[binary]==3.2.3
+# pgvector==0.3.6

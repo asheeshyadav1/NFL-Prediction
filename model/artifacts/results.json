@@ -1,0 +1,60 @@
+{
+  "test_season": 2024,
+  "val_season": 2023,
+  "train_seasons": [
+    2016,
+    2022
+  ],
+  "seed": 17,
+  "best_epoch": 7,
+  "val": {
+    "n_player_weeks": 4194,
+    "baseline_mae": 4.809854030609131,
+    "model_mae": 4.375953674316406,
+    "mae_improvement_pct": 9.021071191172396,
+    "baseline_rmse": 6.686126708984375,
+    "model_rmse": 6.2502264976501465,
+    "start_sit_pairs": 5419,
+    "baseline_start_sit_acc": 0.7468167558590145,
+    "model_start_sit_acc": 0.7698837423878945,
+    "start_sit_pairs_same_position": 13602,
+    "baseline_start_sit_acc_same_position": 0.7197470960152919,
+    "model_start_sit_acc_same_position": 0.7421702690780767
+  },
+  "test": {
+    "n_player_weeks": 4213,
+    "baseline_mae": 4.911910533905029,
+    "model_mae": 4.5190911293029785,
+    "mae_improvement_pct": 7.997283376612207,
+    "baseline_rmse": 6.811141490936279,
+    "model_rmse": 6.468710899353027,
+    "start_sit_pairs": 5399,
+    "baseline_start_sit_acc": 0.7488423782181886,
+    "model_start_sit_acc": 0.7694017410631598,
+    "start_sit_pairs_same_position": 13873,
+    "baseline_start_sit_acc_same_position": 0.720175881208102,
+    "model_start_sit_acc_same_position": 0.7411518777481438
+  },
+  "per_position": {
+    "QB": {
+      "n": 452,
+      "baseline_mae": 6.744999885559082,
+      "model_mae": 6.288727760314941
+    },
+    "RB": {
+      "n": 1106,
+      "baseline_mae": 4.795913219451904,
+      "model_mae": 4.425601959228516
+    },
+    "WR": {
+      "n": 1775,
+      "baseline_mae": 4.964353084564209,
+      "model_mae": 4.532704830169678
+    },
+    "TE": {
+      "n": 880,
+      "baseline_mae": 4.010378837585449,
+      "model_mae": 3.700181484222412
+    }
+  }
+}

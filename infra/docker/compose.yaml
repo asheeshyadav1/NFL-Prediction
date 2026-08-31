@@ -1,0 +1,74 @@
+# Local three-service stack, mirroring the Kubernetes topology.
+#
+#   docker compose -f infra/docker/compose.yaml up --build
+#
+# Brings up Postgres+pgvector so the retrieval path can be exercised for real
+# rather than only in the in-memory fallback. Train first -- the model image
+# bakes in model/artifacts/projection_net.pt.
+name: gridiron
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: gridiron
+      POSTGRES_PASSWORD: gridiron
+      POSTGRES_DB: gridiron
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Applied on first boot of an empty data directory.
+      - ../sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gridiron -d gridiron"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  model-service:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.model
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      MODEL_SERVICE_URL: http://model-service:8001
+      # Uncomment to exercise the pgvector retrieval path. Requires the
+      # optional psycopg/pgvector deps in requirements-api.txt.
+      # DATABASE_URL: postgresql://gridiron:gridiron@postgres:5432/gridiron
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      model-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # Read by the browser, so it must be the host-reachable address rather
+      # than the in-network service name.
+      API_URL: http://localhost:8000
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
