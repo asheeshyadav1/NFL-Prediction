@@ -2,7 +2,7 @@
 
 An LSTM reads the player's last N game lines; its final hidden state is
 concatenated with pre-kickoff context (matchup, rest, role) and passed through a
-small head. Deliberately small -- roughly 40k player-weeks of training data does
+small head. Deliberately small -- roughly 34k player-weeks of training data does
 not support anything larger, and an oversized model here would only overfit and
 make the honest evaluation look worse.
 """

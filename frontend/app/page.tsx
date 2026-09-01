@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 
-const API = process.env.API_URL ?? "http://localhost:8000";
+// Same-origin: the ingress (in Kubernetes) or the Next rewrite in
+// next.config.ts (everywhere else) forwards this prefix to the gateway.
+const API = "/api";
 
 type Projection = {
   player_id: string;

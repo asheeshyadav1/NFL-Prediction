@@ -124,6 +124,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Normalise the image prefix
+        # GHCR rejects uppercase image names, and `github.repository` keeps the
+        # repository's own casing (this one has capitals). Lowercase it once
+        # here so every later step builds a pushable tag.
+        run: echo "IMAGE_PREFIX=${IMAGE_PREFIX,,}" >> "$GITHUB_ENV"
+
       - name: Download trained weights
         uses: actions/download-artifact@v4
         with:
@@ -181,6 +187,12 @@ jobs:
       KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Normalise the image prefix
+        # GHCR rejects uppercase image names, and `github.repository` keeps the
+        # repository's own casing (this one has capitals). Lowercase it once
+        # here so every later step builds a pushable tag.
+        run: echo "IMAGE_PREFIX=${IMAGE_PREFIX,,}" >> "$GITHUB_ENV"
 
       - name: Configure kubectl
         # Skipped when no cluster is configured, so the pipeline stays green on

@@ -16,6 +16,7 @@ we handed it before it goes out.
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Literal
 
@@ -50,9 +51,19 @@ app = FastAPI(
     description="A trained model makes the projection; the LLM only explains it.",
     lifespan=lifespan,
 )
+# Deployed, the browser reaches the gateway same-origin through the ingress, so
+# CORS is not involved at all. It matters only when the API is called directly
+# from a dev frontend on another port -- hence a default that suits that case
+# and an override for anything else.
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

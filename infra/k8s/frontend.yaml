@@ -26,6 +26,9 @@ spec:
             - containerPort: 3000
               name: http
           env:
+            # Server-side only. The browser calls same-origin /api/*, which the
+            # ingress routes straight to the API service; this address is the
+            # fallback used by the Next rewrite for non-ingress traffic.
             - name: API_URL
               value: "http://api:8000"
           resources:
@@ -42,8 +45,21 @@ spec:
             periodSeconds: 10
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          # Next.js writes its runtime image/fetch cache under .next/cache and
+          # uses /tmp, so a read-only root needs these two writable mounts.
+          volumeMounts:
+            - name: next-cache
+              mountPath: /app/.next/cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: next-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

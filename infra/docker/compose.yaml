@@ -64,9 +64,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Read by the browser, so it must be the host-reachable address rather
-      # than the in-network service name.
-      API_URL: http://localhost:8000
+      # Read by the Next server, not the browser: the browser calls same-origin
+      # /api/* and Next proxies it here. So this is the in-network service name.
+      API_URL: http://api:8000
     depends_on:
       - api
 
