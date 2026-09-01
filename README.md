@@ -226,7 +226,3 @@ kubectl apply -f infra/k8s/          # after pushing images and setting the tags
     ├── k8s/               # Deployments, Services, Ingress, kind config
     └── sql/               # Postgres + pgvector schema
 ```
-
-> ⚠️ `data/news/seed_news.json` is a **synthetic demo fixture**, not real reporting.
-> Every snippet is hand-written and labelled `SYNTHETIC-DEMO` so it cannot be mistaken
-> for a real report. `data/news/injuries.json` beside it *is* real — see below.

@@ -2,10 +2,8 @@
 
     DATABASE_URL=postgresql://... python scripts/load_features.py
 
-Optional: the API runs off cached parquet and an in-memory index when
-DATABASE_URL is unset. This is the production path -- it applies
-`infra/sql/schema.sql`, writes one row per projectable player-week, and embeds
-the news corpus into the pgvector table.
+Optional -- the API falls back to cached parquet and an in-memory index. Applies
+`infra/sql/schema.sql`, writes one row per player-week, embeds the news corpus.
 """
 
 from __future__ import annotations

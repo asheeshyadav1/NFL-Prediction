@@ -89,8 +89,7 @@ def main() -> None:
     )
     model = ProjectionNet(len(SEQ_STATS), len(CONTEXT_FEATURES), hidden=args.hidden)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
-    # L1 matches the headline metric (MAE) and is less bullied by the long right
-    # tail of fantasy scoring than MSE.
+    # L1 matches the headline MAE and resists the long right tail better than MSE.
     loss_fn = nn.L1Loss()
 
     ARTIFACTS.mkdir(parents=True, exist_ok=True)

@@ -1,9 +1,6 @@
-# The model service gets its own Deployment.
-#
-# It loads model weights and the feature frame into memory, so it wants
-# materially more RAM than the gateway and takes ~1-2 minutes to become ready.
-# It also scales on projection volume rather than web traffic. Those are three
-# independent reasons it should not share a pod with the API.
+# Its own Deployment: it holds weights and the feature frame in memory, needs
+# materially more RAM, takes ~1-2 min to become ready, and scales on projection
+# volume rather than web traffic.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

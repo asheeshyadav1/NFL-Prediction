@@ -1,7 +1,4 @@
-"""Schemas shared by the gateway and the model service.
-
-Both services import these so the wire contract between them is defined once.
-"""
+"""Wire contract shared by the gateway and the model service."""
 
 from __future__ import annotations
 

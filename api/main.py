@@ -1,16 +1,7 @@
-"""FastAPI gateway.
+"""FastAPI gateway: `uvicorn api.main:app --reload`.
 
-    uvicorn api.main:app --reload
-
-Two endpoints matter:
-  POST /project    -- the model's number, and nothing else
-  POST /recommend  -- projection + retrieval + narration
-
-This is where the separation the project is built on becomes visible:
-`/recommend` gets the projections first, then hands the *already-decided*
-numbers to the retriever and the narrator. Neither can revise them -- the
-retriever returns only text, and the narration is checked against the numbers
-we handed it before it goes out.
+POST /project returns the model's number alone; POST /recommend adds retrieval
+and narration on top of already-decided projections.
 """
 
 from __future__ import annotations
@@ -51,10 +42,8 @@ app = FastAPI(
     description="A trained model makes the projection; the LLM only explains it.",
     lifespan=lifespan,
 )
-# Deployed, the browser reaches the gateway same-origin through the ingress, so
-# CORS is not involved at all. It matters only when the API is called directly
-# from a dev frontend on another port -- hence a default that suits that case
-# and an override for anything else.
+# Only used when a browser calls the API cross-origin; behind the ingress
+# everything is same-origin.
 ALLOWED_ORIGINS = [
     o.strip()
     for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
@@ -75,13 +64,8 @@ def _confidence(margin: float) -> Literal["high", "moderate", "low"]:
 
 @app.get("/health")
 def health(response: Response) -> dict:
-    """Readiness, not liveness.
-
-    The gateway cannot answer a single useful request without the model service,
-    so an unreachable model service is reported as `degraded` with a 503 -- a
-    flat `ok` here would let Kubernetes route traffic to a pod that can only
-    return errors.
-    """
+    """Readiness: 503 while the model service is unreachable, so Kubernetes
+    stops routing to a pod that can only return errors."""
     model = state["projections"].health()
     healthy = model.get("status") != "unreachable"
     if not healthy:
@@ -112,8 +96,7 @@ def recommend(req: RecommendRequest) -> Recommendation:
     hi, lo = (a, b) if a.projection >= b.projection else (b, a)
     margin = round(hi.projection - lo.projection, 1)
 
-    # One query per player rather than a merged one: a combined query dilutes
-    # both names and reliably retrieves neither player's news.
+    # One query per player: a merged query dilutes both names and matches neither.
     snippets: list[rag.Snippet] = []
     seen: set[str] = set()
     for player in (a, b):

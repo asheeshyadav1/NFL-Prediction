@@ -1,9 +1,7 @@
 """How the gateway talks to the model service.
 
-Two implementations behind one interface. In Kubernetes the gateway calls the
-model service over HTTP (`MODEL_SERVICE_URL`); locally, with the variable unset,
-it loads the model in-process so the whole thing runs with one command. The
-gateway code is identical either way.
+HTTP when MODEL_SERVICE_URL is set, in-process otherwise. Gateway code is
+identical either way.
 """
 
 from __future__ import annotations
@@ -38,10 +36,8 @@ class InProcessClient:
             from api.inference import Projector
         except ImportError as exc:  # the model code is absent from the API image
             raise RuntimeError(
-                f"cannot load the model in-process (missing {exc.name!r}). The "
-                "API image ships without torch or the model package on purpose "
-                "-- set MODEL_SERVICE_URL so the gateway calls the model "
-                "service instead."
+                f"cannot load the model in-process (missing {exc.name!r}) -- the "
+                "API image ships without torch on purpose. Set MODEL_SERVICE_URL."
             ) from exc
 
         self._projector = Projector()
@@ -87,8 +83,7 @@ class HttpClient:
         except httpx.HTTPError as exc:
             raise HTTPException(503, f"model service unreachable: {exc}") from exc
         if response.status_code == 404:
-            # Pass the model service's own 404 through rather than reporting a
-            # missing player as a gateway failure.
+            # Pass the model service's 404 through, not as a gateway failure.
             raise HTTPException(404, response.json().get("detail", "player not found"))
         response.raise_for_status()
         return Projection(**response.json())

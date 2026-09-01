@@ -1,12 +1,8 @@
 """Retrieval over recent injury/news snippets.
 
-Retrieval feeds *context* to the narrator. It never touches the projection --
-that separation is the point of the whole project, so it is enforced here by
-structure: this module has no access to the model and returns only text.
-
-Embeddings use a hashing vectorizer: deterministic, fixed-dimension, no fitting
-step, and no API round-trip. That keeps the demo reproducible; swapping in a
-hosted embedding model means replacing `embed()` alone.
+Feeds context to the narrator and never touches the projection -- this module
+has no access to the model and returns only text. Embeddings use a hashing
+vectorizer (deterministic, no fitting step); swap `embed()` to change that.
 """
 
 from __future__ import annotations
@@ -48,21 +44,14 @@ class Snippet:
         return f"[{self.source} | {self.published}] {self.player}: {self.text}"
 
     def document(self) -> str:
-        """What actually gets embedded.
-
-        The player's name and team live in their own fields but are the highest-
-        signal terms for matching a start/sit query, so they go into the embedded
-        document rather than being left out of it.
-        """
+        """What gets embedded. Name and team are the highest-signal terms for a
+        start/sit query, so they go in rather than being left to their fields."""
         return f"{self.player} {self.team} {self.text}"
 
 
 class InMemoryStore:
-    """Cosine-similarity search over an in-process matrix.
-
-    The fallback when no database is configured. Same query interface as the
-    pgvector store, so the API layer doesn't know which one it has.
-    """
+    """Cosine-similarity search in-process. Fallback when no database is
+    configured; same interface as the pgvector store."""
 
     backend = "in-memory"
 
@@ -76,11 +65,9 @@ class InMemoryStore:
         if not self._snippets:
             return []
         scores = self._matrix @ embed([query])[0]  # rows are L2-normalised
-        # Recency breaks ties. An ingested corpus holds one row per player per
-        # week, and the same player's Week 3 and Week 14 reports embed almost
-        # identically -- similarity alone would pick between them arbitrarily
-        # and can hand the narrator a season-old status. `np.lexsort` orders by
-        # its last key first, so this is "score desc, then published desc".
+        # Recency breaks ties: one player's Week 3 and Week 14 reports embed
+        # almost identically, so similarity alone can return a stale status.
+        # lexsort orders by its last key first -- score desc, then published desc.
         published = np.array([s.published for s in self._snippets])
         top = np.lexsort((published, scores))[::-1][:k]
         return [
@@ -159,12 +146,10 @@ class PgVectorStore:
 
 
 def load_snippets(path: Path = NEWS_DIR) -> list[Snippet]:
-    """Load every corpus under `path` (or a single corpus file).
+    """Load every corpus under `path` (or a single file).
 
-    Corpora are additive: the hand-written demo fixture and an ingested feed sit
-    side by side, each keeping its own `source` label, so a citation always says
-    which one it came from. Ids are deduplicated across files -- re-running an
-    ingest overwrites rather than duplicating.
+    Corpora are additive and each keeps its own `source` label, so a citation
+    says where it came from. Ids dedupe across files, so re-ingesting overwrites.
     """
     files = sorted(path.glob("*.json")) if path.is_dir() else [path]
     if not files:
