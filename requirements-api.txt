@@ -6,7 +6,7 @@ pydantic==2.13.5
 httpx==0.28.1
 numpy==2.5.2
 scikit-learn==1.9.0
-anthropic==1.2.0
+google-genai==2.21.0
 
 # Optional: pgvector-backed retrieval. Without these the retriever falls back
 # to the in-process store, so the demo runs with no database.

@@ -50,7 +50,7 @@ services:
       # Uncomment to exercise the pgvector retrieval path. Requires the
       # optional psycopg/pgvector deps in requirements-api.txt.
       # DATABASE_URL: postgresql://gridiron:gridiron@postgres:5432/gridiron
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       model-service:
         condition: service_healthy

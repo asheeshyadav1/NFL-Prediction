@@ -32,11 +32,11 @@ spec:
             # the model service instead of loading the model itself.
             - name: MODEL_SERVICE_URL
               value: "http://model-service:8001"
-            - name: ANTHROPIC_API_KEY
+            - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: gridiron-secrets
-                  key: anthropic-api-key
+                  key: gemini-api-key
                   optional: true   # falls back to the template narrator
             - name: DATABASE_URL
               valueFrom:

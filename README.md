@@ -57,7 +57,7 @@ Everything is optional — the service runs fully without any of it.
 | Variable | Unset behaviour |
 |---|---|
 | `MODEL_SERVICE_URL` | Gateway loads the model in-process instead of calling the model service |
-| `ANTHROPIC_API_KEY` | Narration falls back to a deterministic template |
+| `GEMINI_API_KEY` | Narration falls back to a deterministic template |
 | `DATABASE_URL` | Retrieval falls back to an in-process vector index |
 | `API_URL` | Frontend proxies `/api/*` to `http://localhost:8000` |
 | `ALLOWED_ORIGINS` | Gateway allows CORS from `http://localhost:3000` |
@@ -168,7 +168,7 @@ kubectl apply -f infra/k8s/          # after pushing images and setting the tags
 - **Model:** Python, PyTorch, scikit-learn, nflverse data
 - **Serving:** FastAPI, Uvicorn
 - **Data:** PostgreSQL with `pgvector` (features + vector store in one instance)
-- **RAG + LLM:** hashing-vectorizer embeddings + Claude (`claude-opus-5`) for narration
+- **RAG + LLM:** hashing-vectorizer embeddings + Gemini (`gemini-2.5-flash`) for narration
 - **Frontend:** Next.js / TypeScript
 - **Infra:** Docker, Kubernetes (`kind` for local), GitHub Actions
 
