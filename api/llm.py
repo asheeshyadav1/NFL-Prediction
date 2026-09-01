@@ -5,7 +5,7 @@ it the projections and the retrieved snippets and tells it, explicitly, that
 inventing or adjusting a number is out of bounds -- and the response is checked
 for the projected values so a drifting narration is caught rather than shipped.
 
-Falls back to a deterministic template when ANTHROPIC_API_KEY is unset, so the
+Falls back to a deterministic template when GEMINI_API_KEY is unset, so the
 service runs end-to-end without credentials.
 """
 
@@ -17,7 +17,8 @@ from dataclasses import dataclass
 
 log = logging.getLogger(__name__)
 
-MODEL = "claude-opus-5"
+# Overridable because hosted model names churn faster than this code does.
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
 SYSTEM = """You explain fantasy football start/sit recommendations.
 
@@ -73,14 +74,33 @@ def _verify(text: str, players: list[dict]) -> bool:
     return all(f"{p['projection']:.1f}" in text for p in players)
 
 
+def _finish_reason(response) -> str:
+    candidates = getattr(response, "candidates", None) or []
+    return str(getattr(candidates[0], "finish_reason", "no candidates")) if candidates \
+        else "no candidates"
+
+
+def _completed(response) -> bool:
+    """True when the model stopped normally rather than being cut off or blocked."""
+    if getattr(response, "prompt_feedback", None) and response.prompt_feedback.block_reason:
+        return False
+    candidates = getattr(response, "candidates", None) or []
+    if not candidates:
+        return False
+    reason = getattr(candidates[0], "finish_reason", None)
+    return reason is None or str(reason).endswith("STOP")
+
+
 def narrate(player_a: dict, player_b: dict, snippets: list[str]) -> Narration:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
         text = _template(player_a, player_b, snippets)
-        return Narration(text=text, model="template (no ANTHROPIC_API_KEY set)", grounded=True)
+        return Narration(text=text, model="template (no GEMINI_API_KEY set)", grounded=True)
 
-    import anthropic
+    from google import genai
+    from google.genai import types
 
-    client = anthropic.Anthropic()
+    client = genai.Client(api_key=api_key)
     context = "\n".join(f"- {s}" for s in snippets) or "- (no relevant snippets retrieved)"
     prompt = f"""Compare these two players for the upcoming week.
 
@@ -93,29 +113,45 @@ RETRIEVED NEWS SNIPPETS:
 
 Which should the manager start, and why?"""
 
-    response = client.beta.messages.create(
-        model=MODEL,
-        max_tokens=1024,
-        # Short, tightly-constrained narration -- medium effort is the right
-        # balance here; the reasoning load is in the model, not the prose.
-        output_config={"effort": "medium"},
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-        system=SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    try:
+        response = client.models.generate_content(
+            model=MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM,
+                max_output_tokens=1024,
+                # The numbers are fixed before we get here, so the only thing
+                # temperature can vary is the prose. Keep it low.
+                temperature=0.3,
+                # We pass no tools, and leaving this on makes the SDK log an
+                # advisory warning on every single request.
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True
+                ),
+            ),
+        )
+    except Exception as exc:  # a narration outage must not fail the request
+        log.warning("narrator call failed (%s) -- using the template", exc)
+        return Narration(
+            text=_template(player_a, player_b, snippets),
+            model="template (narrator unavailable)",
+            grounded=True,
+        )
 
-    if response.stop_reason == "refusal":
-        log.warning("narrator declined (%s) -- using the template",
-                    getattr(response.stop_details, "category", None))
+    # A safety block, a recitation stop or an empty candidate all arrive as
+    # "no usable text" rather than an exception, so treat them the same way:
+    # fall back rather than return an empty explanation next to real numbers.
+    text = (response.text or "").strip() if _completed(response) else ""
+    if not text:
+        log.warning("narrator returned no usable text (%s) -- using the template",
+                    _finish_reason(response))
         return Narration(
             text=_template(player_a, player_b, snippets),
             model="template (model declined)",
             grounded=True,
         )
 
-    text = "".join(b.text for b in response.content if b.type == "text").strip()
     grounded = _verify(text, [player_a, player_b])
     if not grounded:
         log.warning("narration did not quote the projected totals verbatim")
-    return Narration(text=text, model=response.model, grounded=grounded)
+    return Narration(text=text, model=MODEL, grounded=grounded)

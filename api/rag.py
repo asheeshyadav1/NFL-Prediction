@@ -23,7 +23,7 @@ from sklearn.feature_extraction.text import HashingVectorizer
 log = logging.getLogger(__name__)
 
 EMBED_DIM = 512
-NEWS_PATH = Path(__file__).resolve().parent.parent / "data" / "news" / "seed_news.json"
+NEWS_DIR = Path(__file__).resolve().parent.parent / "data" / "news"
 
 _vectorizer = HashingVectorizer(
     n_features=EMBED_DIM, alternate_sign=False, norm="l2", stop_words="english"
@@ -76,7 +76,13 @@ class InMemoryStore:
         if not self._snippets:
             return []
         scores = self._matrix @ embed([query])[0]  # rows are L2-normalised
-        top = np.argsort(-scores)[:k]
+        # Recency breaks ties. An ingested corpus holds one row per player per
+        # week, and the same player's Week 3 and Week 14 reports embed almost
+        # identically -- similarity alone would pick between them arbitrarily
+        # and can hand the narrator a season-old status. `np.lexsort` orders by
+        # its last key first, so this is "score desc, then published desc".
+        published = np.array([s.published for s in self._snippets])
+        top = np.lexsort((published, scores))[::-1][:k]
         return [
             Snippet(**{**self._snippets[i].__dict__, "score": float(scores[i])})
             for i in top
@@ -140,7 +146,7 @@ class PgVectorStore:
                 SELECT id, player, team, published, source, text,
                        1 - (embedding <=> %s) AS score
                 FROM news_snippets
-                ORDER BY embedding <=> %s
+                ORDER BY embedding <=> %s, published DESC
                 LIMIT %s
                 """,
                 (vec, vec, k),
@@ -152,11 +158,31 @@ class PgVectorStore:
             ]
 
 
-def load_snippets(path: Path = NEWS_PATH) -> list[Snippet]:
-    if not path.exists():
-        log.warning("no news corpus at %s -- retrieval will return nothing", path)
+def load_snippets(path: Path = NEWS_DIR) -> list[Snippet]:
+    """Load every corpus under `path` (or a single corpus file).
+
+    Corpora are additive: the hand-written demo fixture and an ingested feed sit
+    side by side, each keeping its own `source` label, so a citation always says
+    which one it came from. Ids are deduplicated across files -- re-running an
+    ingest overwrites rather than duplicating.
+    """
+    files = sorted(path.glob("*.json")) if path.is_dir() else [path]
+    if not files:
+        log.warning("no news corpus under %s -- retrieval will return nothing", path)
         return []
-    return [Snippet(**row) for row in json.loads(path.read_text())["snippets"]]
+
+    snippets: dict[str, Snippet] = {}
+    for file in files:
+        try:
+            rows = json.loads(file.read_text())["snippets"]
+        except (ValueError, KeyError) as exc:  # a bad corpus shouldn't be fatal
+            log.warning("skipping unreadable corpus %s (%s)", file.name, exc)
+            continue
+        for row in rows:
+            snippet = Snippet(**row)
+            snippets[snippet.id] = snippet
+        log.info("loaded %d snippets from %s", len(rows), file.name)
+    return list(snippets.values())
 
 
 def build_store(snippets: list[Snippet] | None = None):
