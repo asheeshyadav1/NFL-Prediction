@@ -50,6 +50,37 @@ curl -s localhost:8000/recommend -H 'content-type: application/json' \
   -d '{"player_a": "Mark Andrews", "player_b": "Brock Bowers"}'
 ```
 
+### Injury data
+
+The retrieval corpus is built from the **official NFL injury report** — the same
+practice-participation and game-status report published at
+[nfl.com/injuries](https://www.nfl.com/injuries/):
+
+```bash
+# Full seasons (what is committed): ~3.5k snippets, 2024-2025
+python scripts/ingest_injuries.py --seasons 2024 2025
+
+# Just the recent weeks, which is what you want for serving
+python scripts/ingest_injuries.py --seasons 2025 --last-weeks 4
+```
+
+This reads the nflverse `injuries` release rather than scraping nfl.com. The
+public page renders its table in the browser from a token-gated internal API, so
+scraping it means impersonating app credentials and breaks whenever the page
+changes; the release is the same report in a stable form, and it carries
+`gsis_id` — the id the feature store already keys players on.
+
+`load_snippets()` reads **every** `data/news/*.json`, so corpora are additive and
+each keeps its own `source` label. Citations shown to the user therefore always
+say whether a snippet came from `NFL-INJURY-REPORT` or `SYNTHETIC-DEMO`, and
+adding another feed means writing one more file in that schema.
+
+One caveat worth knowing: the corpus holds one row per player per week, and the
+same player's Week 3 and Week 14 reports embed almost identically. Retrieval
+breaks exact similarity ties by recency, but wording alone can still score an
+older week marginally higher — so ingest with `--last-weeks` for serving rather
+than relying on the ranking to prefer the current week.
+
 ### Configuration
 
 Everything is optional — the service runs fully without any of it.
@@ -187,8 +218,9 @@ kubectl apply -f infra/k8s/          # after pushing images and setting the tags
 ├── api/                   # gateway: retrieval, narration, projection client
 ├── frontend/              # Next.js start/sit view + /api/* proxy route
 ├── tests/                 # leakage suite + service contract tests
-├── scripts/load_features.py  # load features + news into Postgres/pgvector
-├── data/news/             # synthetic news fixture for the RAG demo
+├── scripts/load_features.py     # load features + news into Postgres/pgvector
+├── scripts/ingest_injuries.py   # official NFL injury report -> retrieval corpus
+├── data/news/             # retrieval corpus: ingested injuries + demo fixture
 └── infra/
     ├── docker/            # one Dockerfile per service + compose stack
     ├── k8s/               # Deployments, Services, Ingress, kind config
@@ -197,4 +229,4 @@ kubectl apply -f infra/k8s/          # after pushing images and setting the tags
 
 > ⚠️ `data/news/seed_news.json` is a **synthetic demo fixture**, not real reporting.
 > Every snippet is hand-written and labelled `SYNTHETIC-DEMO` so it cannot be mistaken
-> for a real report. Point the ingest at an actual news feed to run for real.
+> for a real report. `data/news/injuries.json` beside it *is* real — see below.
