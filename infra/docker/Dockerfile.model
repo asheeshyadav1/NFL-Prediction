@@ -20,6 +20,11 @@ COPY model_service/ ./model_service/
 # dependency at startup. Run `python model/train.py` before building.
 COPY model/artifacts/projection_net.pt ./model/artifacts/projection_net.pt
 
+# The cached nflverse parquet, for the same reason. The feature store is built
+# at startup from these files; without them the service would try to download
+# them into a read-only root filesystem and crash-loop. ~8 MB.
+COPY data/raw/ ./data/raw/
+
 RUN useradd --create-home --uid 10001 app && chown -R app:app /app
 USER app
 
