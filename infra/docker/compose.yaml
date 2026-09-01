@@ -1,10 +1,9 @@
-# Local three-service stack, mirroring the Kubernetes topology.
+# Local three-service stack mirroring the Kubernetes topology, with
+# Postgres+pgvector so retrieval runs for real rather than in the fallback.
 #
 #   docker compose -f infra/docker/compose.yaml up --build
 #
-# Brings up Postgres+pgvector so the retrieval path can be exercised for real
-# rather than only in the in-memory fallback. Train first -- the model image
-# bakes in model/artifacts/projection_net.pt.
+# Train first: the model image bakes in model/artifacts/projection_net.pt.
 name: gridiron
 
 services:

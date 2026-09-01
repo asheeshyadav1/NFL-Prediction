@@ -1,12 +1,9 @@
 """Sequence windowing and the temporal split.
 
-Two things in this file carry the project's credibility:
+Two invariants carry the project's credibility:
 
-1. A window for player-week *t* contains games *t-N .. t-1* only. The target week's
-   box score is never inside its own input.
-2. The split is by time, never at random. Train on early seasons, validate on the
-   next, test on the last. A random split leaks future weeks into training and
-   inflates every metric downstream.
+1. A window for player-week *t* holds games *t-N .. t-1* only -- never its own.
+2. The split is by time, never random; a random split leaks future weeks.
 """
 
 from __future__ import annotations
@@ -21,8 +18,7 @@ from torch.utils.data import Dataset
 from features import CONTEXT_FEATURES, SEQ_STATS, TARGET
 
 SEQ_LEN = 6
-# A player needs some history before a projection is meaningful. This also keeps
-# the naive baseline (a 3-game average) well defined, so the comparison is fair.
+# Also keeps the naive 3-game baseline well defined, so the comparison is fair.
 MIN_HISTORY = 3
 
 
@@ -58,9 +54,8 @@ def temporal_split(df: pd.DataFrame, val_season: int, test_season: int) -> Split
 def build_windows(df: pd.DataFrame) -> dict[str, np.ndarray]:
     """Turn the modelling frame into fixed-length per-player sequences.
 
-    Returns arrays aligned row-for-row with the *kept* rows of `df`: rows without
-    at least MIN_HISTORY prior games are dropped, since neither the model nor the
-    baseline has anything to work from.
+    Arrays align row-for-row with the kept rows of `df`; rows with fewer than
+    MIN_HISTORY prior games are dropped.
     """
     df = df.sort_values(["player_id", "season", "week"]).reset_index(drop=True)
     seq_mat = df[SEQ_STATS].to_numpy(dtype=np.float32)
@@ -92,11 +87,8 @@ def build_windows(df: pd.DataFrame) -> dict[str, np.ndarray]:
 
 
 class Standardizer:
-    """Mean/std scaling fit on the training split only.
-
-    Fitting on the full dataset would leak test-set distribution into training --
-    a small leak, but the kind this project is supposed to be careful about.
-    """
+    """Mean/std scaling fit on the training split only; fitting on everything
+    would leak the test-set distribution into training."""
 
     def __init__(self) -> None:
         self.seq_mean = self.seq_std = self.ctx_mean = self.ctx_std = None

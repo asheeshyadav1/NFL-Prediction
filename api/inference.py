@@ -1,8 +1,4 @@
-"""Load the trained weights and serve projections.
-
-This module owns the number. Nothing downstream -- not the retriever, not the
-LLM -- is allowed to change it.
-"""
+"""Load the trained weights and serve projections. This module owns the number."""
 
 from __future__ import annotations
 

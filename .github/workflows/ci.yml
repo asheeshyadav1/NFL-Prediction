@@ -1,8 +1,5 @@
-# CI/CD: test -> build images -> push -> deploy.
-#
-# Note: this lives at the repository root, not under infra/. GitHub only reads
-# workflows from `.github/workflows/` at the root -- a workflow file under
-# `infra/.github/workflows/` is never executed.
+# CI/CD: test -> train -> build images -> push -> deploy.
+# Must live at the repo root; GitHub only reads .github/workflows/ from there.
 name: ci
 
 on:
@@ -108,11 +105,9 @@ jobs:
           PY
 
       - name: Upload trained weights and cached data
-        # data/raw/ is gitignored, so a fresh checkout in the images job has no
-        # nflverse parquet -- and Dockerfile.model copies it into the image so
-        # the model service can build its feature store without network access.
-        # Both paths ride along here; the artifact root is their common
-        # ancestor (the repo root), so the download restores them in place.
+        # data/raw/ is gitignored, so the images job's checkout has no parquet --
+        # and Dockerfile.model copies it in. The artifact root is the repo root,
+        # so the download restores both paths in place.
         uses: actions/upload-artifact@v4
         with:
           name: model-artifacts

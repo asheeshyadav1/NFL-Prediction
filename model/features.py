@@ -1,9 +1,8 @@
 """Feature engineering.
 
-The single rule this file exists to enforce: **every feature attached to a
-player-week row must be computable before that game kicks off.** Any rolling
-statistic is shifted by one game, and opponent strength is an expanding mean over
-strictly prior weeks. If you add a feature here, shift it.
+One rule: every feature on a player-week row must be computable before that game
+kicks off. Rolling stats are shifted a game, opponent strength is an expanding
+mean over strictly prior weeks. If you add a feature here, shift it.
 """
 
 from __future__ import annotations
@@ -11,8 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-# Per-game box-score stats. These form the *sequence* fed to the LSTM -- one
-# vector per historical game.
+# The sequence fed to the LSTM: one vector per historical game.
 SEQ_STATS = [
     "fantasy_points_ppr",
     "targets",
@@ -73,10 +71,10 @@ def _team_week_context(schedules: pd.DataFrame) -> pd.DataFrame:
 
 
 def _opponent_strength(weekly: pd.DataFrame) -> pd.DataFrame:
-    """PPR points a defense has allowed to a position, using prior weeks only.
+    """PPR points a defense has allowed to a position, prior weeks only.
 
-    Computed as an expanding mean ordered by (season, week) and shifted one game,
-    so a defense's rating for week N never contains week N's result.
+    An expanding mean shifted one game, so a rating for week N never contains
+    week N's own result.
     """
     allowed = (
         weekly.groupby(["season", "week", "opponent_team", "position"], as_index=False)[
@@ -92,8 +90,7 @@ def _opponent_strength(weekly: pd.DataFrame) -> pd.DataFrame:
         lambda s: s.shift(1).expanding().mean()
     )
 
-    # Early rows have no history; fall back to the league mean for that position,
-    # itself computed from prior seasons only.
+    # Early rows have no history; fall back to the position's prior-only mean.
     pos_mean = (
         allowed.sort_values(["position", "season", "week"])
         .groupby("position")["allowed"]

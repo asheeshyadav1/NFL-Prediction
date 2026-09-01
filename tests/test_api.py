@@ -1,11 +1,8 @@
 """Service-level tests.
 
-These pin the contract the project's whole claim rests on: the number comes from
-the model, and the narration cannot change it.
-
-The gateway tests use a stub projection client so they don't need trained weights
-or the nflverse cache -- the model itself is covered by `model/evaluate.py` and
-the leakage suite.
+Pin the contract the project rests on: the number comes from the model, and the
+narration cannot change it. A stub projection client keeps these independent of
+trained weights and the nflverse cache.
 """
 
 from __future__ import annotations

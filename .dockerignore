@@ -2,13 +2,12 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-# NOTE: data/raw/ is deliberately NOT ignored. Dockerfile.model bakes the
-# cached parquet into the image (~8 MB) so the model service builds its
-# feature store offline. Without it the container tries to download at
-# startup and dies against readOnlyRootFilesystem.
+# data/raw/ is deliberately NOT ignored: Dockerfile.model bakes the cached
+# parquet in (~8 MB) so the model service builds its features offline. Without
+# it the container downloads at startup and dies on readOnlyRootFilesystem.
 .git/
 .github/
-# Node build output is excluded, but frontend/ itself must stay in the build
-# context -- Dockerfile.frontend copies it. The Python images never COPY it.
+# Build output only -- frontend/ itself must stay in the context for
+# Dockerfile.frontend.
 node_modules/
 .next/

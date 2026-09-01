@@ -2,15 +2,10 @@ import { NextRequest } from "next/server";
 
 // Proxies the browser's same-origin /api/* calls to the gateway.
 //
-// This is a route handler rather than a `rewrites()` entry in next.config.ts on
-// purpose: Next bakes rewrite destinations into routes-manifest.json at build
-// time, so a rewrite would freeze whatever API_URL happened to be set during
-// `next build` and silently ignore the value the deployment supplies. Reading
-// the variable inside the handler resolves it per request, which is what lets
-// one image run against a different gateway in compose and in Kubernetes.
-//
-// In Kubernetes this code is normally never reached: the ingress routes /api
-// straight to the API service before it gets to Next.
+// A route handler rather than a `rewrites()` entry: Next bakes rewrite
+// destinations in at build time, which would freeze API_URL into the image.
+// Reading it here resolves it per request. In Kubernetes the ingress routes
+// /api before Next sees it, so this is normally unused there.
 
 export const dynamic = "force-dynamic";
 

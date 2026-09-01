@@ -1,12 +1,8 @@
-"""The narrator.
+"""The narrator: explains a number it did not produce.
 
-The LLM's only job is to explain a number it did not produce. The prompt gives
-it the projections and the retrieved snippets and tells it, explicitly, that
-inventing or adjusting a number is out of bounds -- and the response is checked
-for the projected values so a drifting narration is caught rather than shipped.
-
-Falls back to a deterministic template when GEMINI_API_KEY is unset, so the
-service runs end-to-end without credentials.
+The prompt forbids inventing or adjusting a projection, and the response is
+checked against the values we supplied. Falls back to a deterministic template
+when GEMINI_API_KEY is unset, so the service runs without credentials.
 """
 
 from __future__ import annotations
@@ -120,11 +116,9 @@ Which should the manager start, and why?"""
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM,
                 max_output_tokens=1024,
-                # The numbers are fixed before we get here, so the only thing
-                # temperature can vary is the prose. Keep it low.
+                # Numbers are already fixed; temperature only varies the prose.
                 temperature=0.3,
-                # We pass no tools, and leaving this on makes the SDK log an
-                # advisory warning on every single request.
+                # No tools are passed; leaving this on logs a warning per request.
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(
                     disable=True
                 ),
@@ -138,9 +132,8 @@ Which should the manager start, and why?"""
             grounded=True,
         )
 
-    # A safety block, a recitation stop or an empty candidate all arrive as
-    # "no usable text" rather than an exception, so treat them the same way:
-    # fall back rather than return an empty explanation next to real numbers.
+    # Safety blocks, recitation stops and empty candidates arrive as "no usable
+    # text" rather than exceptions -- fall back instead of shipping empty prose.
     text = (response.text or "").strip() if _completed(response) else ""
     if not text:
         log.warning("narrator returned no usable text (%s) -- using the template",

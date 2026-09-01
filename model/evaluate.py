@@ -1,7 +1,7 @@
-"""Metrics and baselines -- the credibility of the whole project.
+"""Metrics and baselines.
 
-Every number the README quotes is produced here, on the held-out *test season*
-the model never saw during training or model selection.
+Every number the README quotes is produced here, on the held-out test season the
+model never saw during training or selection.
 """
 
 from __future__ import annotations

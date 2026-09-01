@@ -1,10 +1,8 @@
 """The projection network.
 
-An LSTM reads the player's last N game lines; its final hidden state is
-concatenated with pre-kickoff context (matchup, rest, role) and passed through a
-small head. Deliberately small -- roughly 34k player-weeks of training data does
-not support anything larger, and an oversized model here would only overfit and
-make the honest evaluation look worse.
+An LSTM over the player's last N game lines; its final hidden state joins
+pre-kickoff context (matchup, rest, role) through a small head. Kept small on
+purpose -- 34k training player-weeks does not support more.
 """
 
 from __future__ import annotations
@@ -41,6 +39,5 @@ class ProjectionNet(nn.Module):
     def forward(self, seq: torch.Tensor, ctx: torch.Tensor) -> torch.Tensor:
         _, (h_n, _) = self.lstm(seq)
         out = self.head(torch.cat([h_n[-1], ctx], dim=1)).squeeze(-1)
-        # Fantasy points are floored at roughly zero; softplus keeps projections
-        # in a sane range without hard-clipping the gradient.
+        # Points floor near zero; softplus avoids hard-clipping the gradient.
         return nn.functional.softplus(out)

@@ -1,15 +1,8 @@
-"""Model service -- its own deployment.
+"""Model service: `uvicorn model_service.main:app --port 8001`.
 
-    uvicorn model_service.main:app --port 8001
-
-This process owns the weights and the feature store and does exactly one thing:
-turn a player-week into a projected point total. It has no LLM client, no
-retrieval, and no knowledge that either exists.
-
-It is split from the gateway because it scales on a different axis: it holds
-model weights in memory, wants more RAM, and its load tracks projection volume
-rather than web traffic. In Kubernetes it gets its own Deployment with its own
-resource requests and replica count.
+Owns the weights and feature store and does one thing -- player-week to
+projected points. No LLM, no retrieval. Its own deployment because it scales on
+projection volume rather than web traffic.
 """
 
 from __future__ import annotations
@@ -31,7 +24,7 @@ state: dict = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Weights and features load once; a request is then just a forward pass.
+    # Loaded once; a request is then just a forward pass.
     state["projector"] = Projector()
     state["store"] = FeatureStore()
     yield

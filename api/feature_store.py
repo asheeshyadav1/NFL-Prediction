@@ -1,13 +1,8 @@
 """Read-side feature store.
 
-Serving needs the same leakage-safe windows the model trained on, so this reuses
-`model/` directly rather than reimplementing feature logic -- a second
-implementation is how a serving/training skew bug gets in.
-
-Backed by Postgres when DATABASE_URL is set, otherwise by the cached parquet the
-training pipeline already downloaded. The parquet path keeps the demo runnable
-with no database; `infra/sql/schema.sql` and `scripts/load_features.py` populate
-the Postgres path.
+Reuses `model/` directly rather than reimplementing feature logic -- a second
+implementation is how training/serving skew gets in. Reads the cached parquet;
+`scripts/load_features.py` populates the Postgres path.
 """
 
 from __future__ import annotations

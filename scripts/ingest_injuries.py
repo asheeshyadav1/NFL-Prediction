@@ -2,16 +2,10 @@
 
     python scripts/ingest_injuries.py --seasons 2025 --last-weeks 4
 
-Writes `data/news/injuries.json` in the same schema as the hand-written demo
-fixture, so the retriever picks it up with no code change and every snippet
-carries `source = "NFL-INJURY-REPORT"` -- real reporting stays distinguishable
-from the synthetic fixture at citation time.
-
-Source: the nflverse `injuries` release, which mirrors the same practice and
-game-status report that nfl.com/injuries displays. That page builds its table in
-the browser from a token-gated internal API; the release is the stable,
-joinable form of the identical data, and it carries `gsis_id`, which is the id
-the feature store already keys players on.
+Writes `data/news/injuries.json` in the demo fixture's schema, so the retriever
+picks it up unchanged. Every snippet carries `source = "NFL-INJURY-REPORT"`, so
+real reporting stays distinguishable from the synthetic fixture at citation
+time. Source is the nflverse `injuries` release, which carries `gsis_id`.
 """
 
 from __future__ import annotations
