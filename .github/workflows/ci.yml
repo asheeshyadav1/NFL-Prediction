@@ -107,11 +107,18 @@ jobs:
               sys.exit("model did not beat the naive baseline")
           PY
 
-      - name: Upload trained weights
+      - name: Upload trained weights and cached data
+        # data/raw/ is gitignored, so a fresh checkout in the images job has no
+        # nflverse parquet -- and Dockerfile.model copies it into the image so
+        # the model service can build its feature store without network access.
+        # Both paths ride along here; the artifact root is their common
+        # ancestor (the repo root), so the download restores them in place.
         uses: actions/upload-artifact@v4
         with:
           name: model-artifacts
-          path: model/artifacts/
+          path: |
+            model/artifacts/
+            data/raw/
           retention-days: 14
 
   images:
@@ -130,11 +137,12 @@ jobs:
         # here so every later step builds a pushable tag.
         run: echo "IMAGE_PREFIX=${IMAGE_PREFIX,,}" >> "$GITHUB_ENV"
 
-      - name: Download trained weights
+      - name: Download trained weights and cached data
+        # Restores model/artifacts/ and data/raw/ relative to the repo root.
         uses: actions/download-artifact@v4
         with:
           name: model-artifacts
-          path: model/artifacts/
+          path: .
 
       - uses: docker/setup-buildx-action@v3
 
