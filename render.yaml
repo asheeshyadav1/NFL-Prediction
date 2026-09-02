@@ -1,0 +1,26 @@
+# Render blueprint for the backend. The frontend lives on Netlify; this serves
+# /project, /recommend, /compare, /weeks and /players to it.
+#
+# Deploy: Render dashboard -> New -> Blueprint -> point at this repo.
+services:
+  - type: web
+    name: fourth-and-goal-api
+    runtime: docker
+    dockerfilePath: ./infra/docker/Dockerfile.render
+    dockerContext: .
+    # The feature store builds ~51k player-weeks from parquet at boot, which
+    # takes about 40s, and torch is resident for the life of the process. The
+    # free tier's 512 MB is not enough headroom for that.
+    plan: standard
+    healthCheckPath: /health
+    envVars:
+      # Set to the Netlify site once it exists. Only used if a browser ever
+      # calls this service cross-origin; the Netlify proxy is same-origin.
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # Narration falls back to a deterministic template when this is unset,
+      # so the service runs without it.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash

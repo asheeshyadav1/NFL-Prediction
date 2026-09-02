@@ -1,0 +1,15 @@
+# Frontend only. The Python backend cannot run here (Netlify Functions are
+# JS/TS and Go, and torch alone exceeds the bundle limit), so app/api/[...path]
+# proxies to the Render service named in API_URL.
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
