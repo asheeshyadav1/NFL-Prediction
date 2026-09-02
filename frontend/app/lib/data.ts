@@ -124,6 +124,17 @@ async function resolveCites(rows: PlayerCard[]): Promise<Snippet[]> {
     .filter((s): s is Snippet => s !== null);
 }
 
+// Set once the function tells us there is no narrator behind it.
+let narratorOff = false;
+
+function offline(text: string) {
+  return {
+    narration: text,
+    narration_model: "template (deterministic)",
+    narration_grounded: true,
+  };
+}
+
 async function narrate(
   hi: PlayerCard, lo: PlayerCard, margin: number, snippets: Snippet[],
 ): Promise<Pick<Recommendation, "narration" | "narration_model" | "narration_grounded">> {
@@ -136,6 +147,12 @@ async function narrate(
   // about a pair chosen at runtime. It runs as a Netlify function; if that is
   // unconfigured or down, the deterministic template stands in, exactly as it
   // did server-side.
+  //
+  // Once it reports having no narrator configured, stop asking. The site is
+  // meant to cost nothing to run, and a round trip per comparison that can only
+  // ever answer "not configured" is waste.
+  if (narratorOff) return offline(fallback);
+
   try {
     const res = await fetch("/api/narrate", {
       method: "POST",
@@ -151,15 +168,15 @@ async function narrate(
           narration_grounded: grounded(body.text, [hi, lo]),
         };
       }
+      // A null text with a "no key" model is a settled answer, not a blip.
+      if (typeof body?.model === "string" && body.model.includes("no key")) {
+        narratorOff = true;
+      }
     }
   } catch {
     /* fall through to the template */
   }
-  return {
-    narration: fallback,
-    narration_model: "template (no narrator configured)",
-    narration_grounded: true,
-  };
+  return offline(fallback);
 }
 
 async function decide(a: PlayerCard, b: PlayerCard): Promise<Recommendation> {
