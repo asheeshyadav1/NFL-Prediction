@@ -159,6 +159,9 @@ async function narrate(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ a: hi, b: lo, snippets: snippets.slice(0, 4) }),
     });
+    // 403 means the function is refusing this origin, which no amount of
+    // retrying fixes. Treat it like a missing narrator.
+    if (res.status === 403) narratorOff = true;
     if (res.ok) {
       const body = await res.json();
       if (typeof body?.text === "string" && body.text.trim()) {
