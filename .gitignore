@@ -3,8 +3,14 @@ __pycache__/
 *.pyc
 data/raw/
 model/artifacts/*.pt
+# ...except the shipped one. 112 KB, and both the container build and a fresh
+# clone need it to serve a projection without retraining first.
+!model/artifacts/projection_net.pt
 node_modules/
 .next/
 .env
 .pytest_cache/
 *.tsbuildinfo
+
+# Local Netlify folder
+.netlify
