@@ -579,17 +579,17 @@ export function Console() {
                 <div className="hd">
                   <span>What it says</span>
                   {result.narration_grounded ? (
-                    <span className="tag">Numbers check out</span>
+                    <span className="tag">Matches the model</span>
                   ) : (
-                    <span className="tag bad">Numbers do not check out</span>
+                    <span className="tag bad">Does not match the model</span>
                   )}
                 </div>
                 <div className="say">{result.narration}</div>
                 <div className="fine">
                   Narrated by {result.narration_model}.{" "}
                   {result.narration_grounded
-                    ? "Every point total quoted above is the model's own, matched digit for digit before this was shown to you."
-                    : "The write-up quoted a total the model never produced. Trust the prose, not the numbers."}
+                    ? "Every point total quoted above is the model's own, matched digit for digit, and the write-up backs the player the model picked."
+                    : "The write-up either quoted a total the model never produced or argued for the other player. Trust the projection, not the prose."}
                 </div>
               </div>
 

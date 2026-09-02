@@ -108,9 +108,22 @@ function template(hi: PlayerCard, lo: PlayerCard, margin: number, cite: string |
     : `${head} No relevant news was retrieved, so this rests on the projection alone.`;
 }
 
-// The same check the service ran: did the prose quote our numbers, or its own?
-function grounded(text: string, players: PlayerCard[]): boolean {
-  return players.every((p) => text.includes(p.projection.toFixed(1)));
+// Two questions, not one.
+//
+// The service only asked whether the prose quoted our numbers. That misses the
+// worse failure: a narrator can quote both totals correctly and still recommend
+// the other player, which is it overruling the model rather than explaining it.
+// Some models do exactly that when a snippet cuts against the projection.
+//
+// So the write-up must also open by naming the player the model actually
+// favours. Checked over the opening clause, where the recommendation belongs.
+function grounded(text: string, hi: PlayerCard, lo: PlayerCard): boolean {
+  const quotesBoth = [hi, lo].every((p) => text.includes(p.projection.toFixed(1)));
+  const opening = text.slice(0, 120).toLowerCase();
+  const hiAt = opening.indexOf(hi.name.toLowerCase());
+  const loAt = opening.indexOf(lo.name.toLowerCase());
+  const verdictHolds = hiAt !== -1 && (loAt === -1 || hiAt < loAt);
+  return quotesBoth && verdictHolds;
 }
 
 async function resolveCites(rows: PlayerCard[]): Promise<Snippet[]> {
@@ -168,7 +181,7 @@ async function narrate(
         return {
           narration: body.text,
           narration_model: body.model ?? "gemini",
-          narration_grounded: grounded(body.text, [hi, lo]),
+          narration_grounded: grounded(body.text, hi, lo),
         };
       }
       // A null text with a "no key" model is a settled answer, not a blip.

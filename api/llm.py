@@ -14,7 +14,7 @@ from dataclasses import dataclass
 log = logging.getLogger(__name__)
 
 # Overridable because hosted model names churn faster than this code does.
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
 
 SYSTEM = """You explain fantasy football start/sit recommendations.
 

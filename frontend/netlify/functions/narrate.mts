@@ -9,6 +9,12 @@
 // works by setting LLM_BASE_URL and LLM_MODEL, so switching provider is config
 // rather than code.
 //
+// The model matters more than it looks. gpt-oss-120b, given this exact prompt,
+// reverses the recommendation when a snippet cuts against the projection: it
+// decides the questionable player should be benched. That is the model making
+// the call, which is the one thing this design does not allow. qwen3.8-27b
+// surfaces the same risk and leaves the verdict alone.
+//
 // The key stays server-side and is never sent to the browser. With no key
 // configured the function says so and the caller narrates from its own
 // deterministic template, which is a normal state rather than an error.
@@ -16,7 +22,7 @@
 import type { Config, Context } from "@netlify/functions";
 
 const BASE_URL = process.env.LLM_BASE_URL || "https://api.groq.com/openai/v1";
-const MODEL = process.env.LLM_MODEL || "llama-3.3-70b-versatile";
+const MODEL = process.env.LLM_MODEL || "qwen/qwen3.8-27b";
 
 // This endpoint spends someone's quota, so it only answers its own page.
 // Without this it is a free LLM for anyone who finds the URL, and the bill or
