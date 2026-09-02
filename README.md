@@ -4,9 +4,10 @@
 
 A weekly NFL fantasy-points projection engine where a **trained sequence model** makes
 the predictions and an **LLM only explains them**, grounded in retrieved injury and news
-context. On a held-out 2024 season the model beats a naive last-3-game average by 8.0%
-MAE (4.519 vs 4.912) under a leakage-safe, time-based evaluation whose guarantees are
-unit-tested rather than asserted. The separation is structural: the projection is
+context. On a held-out 2025 season the model beats a naive last-3-game average by 8.6%
+MAE (4.425 vs 4.843) and calls start/sit correctly 78.1% of the time, under a
+leakage-safe, time-based evaluation whose guarantees are unit-tested rather than
+asserted. The separation is structural: the projection is
 computed before retrieval or narration run, the retriever has no access to the model,
 and the narration is verified to quote the numbers it was given.
 
@@ -57,8 +58,15 @@ practice-participation and game-status report published at
 [nfl.com/injuries](https://www.nfl.com/injuries/):
 
 ```bash
-# Full seasons (what is committed): ~3.5k snippets, 2024-2025
-python scripts/ingest_injuries.py --seasons 2024 2025
+# Full seasons (what is committed): ~16k snippets, 2016-2025
+python scripts/ingest_injuries.py --seasons 2016 2017 2018 2019 2020 2021 2022 2023 2024 2025
+
+# Preseason: depth charts + roster status, for a season with no box scores yet
+python scripts/ingest_preseason.py --season 2026
+
+# Or do all of it at once -- safe to re-run, safe to schedule
+python scripts/refresh.py            # data + both corpora
+python scripts/refresh.py --retrain  # ...and retrain on whatever arrived
 
 # Just the recent weeks, which is what you want for serving
 python scripts/ingest_injuries.py --seasons 2025 --last-weeks 4

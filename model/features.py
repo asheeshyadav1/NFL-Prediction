@@ -23,8 +23,14 @@ SEQ_STATS = [
     "rushing_tds",
     "receiving_tds",
     "interceptions",
+    "fumbles_lost",
     "target_share",
 ]
+
+# Lost fumbles are spread across three columns upstream and score -2 each. They
+# are already inside the PPR target, so without them the model is asked to
+# predict a penalty it cannot see coming.
+FUMBLE_COLUMNS = ("sack_fumbles_lost", "rushing_fumbles_lost", "receiving_fumbles_lost")
 
 # Context known ahead of kickoff for the week being projected.
 CONTEXT_FEATURES = [
@@ -104,6 +110,14 @@ def _opponent_strength(weekly: pd.DataFrame) -> pd.DataFrame:
 def build(weekly: pd.DataFrame, schedules: pd.DataFrame) -> pd.DataFrame:
     """Return a modelling frame: one row per projectable player-week."""
     df = weekly.copy()
+
+    # Derived before the SEQ_STATS check below, which is what makes it required.
+    df["fumbles_lost"] = sum(
+        pd.to_numeric(df[c], errors="coerce").fillna(0.0)
+        for c in FUMBLE_COLUMNS
+        if c in df.columns
+    )
+
     for col in SEQ_STATS:
         if col not in df.columns:
             raise KeyError(f"expected column missing from weekly data: {col}")

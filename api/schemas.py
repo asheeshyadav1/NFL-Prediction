@@ -26,6 +26,35 @@ class Projection(BaseModel):
     actual: float | None = Field(None, description="Set only for completed games")
 
 
+class PlayerCard(Projection):
+    """A projection plus enough history to judge it.
+
+    Used by the compare view, where there is no week in the request: the
+    projection is for the player's own most recent game, so `season`/`week`
+    say when that was rather than being chosen by the caller.
+    """
+
+    career_games: int = Field(..., description="Projectable games on record")
+    career_avg: float = Field(..., description="Mean PPR across those games")
+    last6_avg: float = Field(..., description="Mean PPR over the last six")
+
+
+class CompareRequest(BaseModel):
+    player_a: str
+    player_b: str
+
+
+class Comparison(BaseModel):
+    players: list[PlayerCard]
+    start: str
+    margin: float
+    confidence: Literal["high", "moderate", "low"]
+    snippets: list[dict]
+    narration: str
+    narration_model: str
+    narration_grounded: bool
+
+
 class RecommendRequest(BaseModel):
     player_a: str
     player_b: str

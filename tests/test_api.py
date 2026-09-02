@@ -152,3 +152,39 @@ def test_health_is_degraded_when_the_model_service_is_down(
     # than routing traffic to a gateway that can only return errors.
     assert res.status_code == 503
     assert res.json()["status"] == "degraded"
+
+
+# --- narration punctuation -------------------------------------------------
+#
+# The UI carries no em dashes. The system prompt asks the narrator for none,
+# but a prompt is a request rather than a guarantee, so the text is normalised
+# on the way out as well. These pin the normaliser, since a live model cannot
+# be relied on to produce the case under test.
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("Start Chase — he is healthy.", "Start Chase, he is healthy."),
+        ("Start Chase – he is healthy.", "Start Chase, he is healthy."),
+        ("Chase (16.7)—Jefferson (9.9)", "Chase (16.7), Jefferson (9.9)"),
+        ("nothing to change here", "nothing to change here"),
+    ],
+)
+def test_narration_carries_no_em_dashes(raw: str, expected: str) -> None:
+    assert llm._no_em_dashes(raw) == expected
+
+
+def test_normaliser_leaves_the_numbers_alone() -> None:
+    # It runs before the grounding check, so it must not touch any digits.
+    text = "Chase 16.7 PPR — Jefferson 9.9 PPR, a 6.8-point edge."
+    cleaned = llm._no_em_dashes(text)
+    for number in ("16.7", "9.9", "6.8"):
+        assert number in cleaned
+    assert "—" not in cleaned
+
+
+def test_template_narration_has_no_dash_stand_ins() -> None:
+    a = {"name": "A", "position": "WR", "team": "CIN", "opponent": "BAL", "projection": 16.7}
+    b = {"name": "B", "position": "WR", "team": "MIN", "opponent": "DAL", "projection": 9.9}
+    text = llm._template(a, b, [])
+    assert "—" not in text and "–" not in text and " -- " not in text

@@ -1,60 +1,61 @@
 {
-  "test_season": 2024,
-  "val_season": 2023,
+  "test_season": 2025,
+  "val_season": 2024,
   "train_seasons": [
     2016,
-    2022
+    2023
   ],
   "seed": 17,
-  "best_epoch": 7,
+  "floor": 0.0,
+  "best_epoch": 15,
   "val": {
-    "n_player_weeks": 4194,
-    "baseline_mae": 4.809854030609131,
-    "model_mae": 4.375953674316406,
-    "mae_improvement_pct": 9.021071191172396,
-    "baseline_rmse": 6.686126708984375,
-    "model_rmse": 6.2502264976501465,
-    "start_sit_pairs": 5419,
-    "baseline_start_sit_acc": 0.7468167558590145,
-    "model_start_sit_acc": 0.7698837423878945,
-    "start_sit_pairs_same_position": 13602,
-    "baseline_start_sit_acc_same_position": 0.7197470960152919,
-    "model_start_sit_acc_same_position": 0.7421702690780767
-  },
-  "test": {
     "n_player_weeks": 4213,
     "baseline_mae": 4.911910533905029,
-    "model_mae": 4.5190911293029785,
-    "mae_improvement_pct": 7.997283376612207,
+    "model_mae": 4.514986991882324,
+    "mae_improvement_pct": 8.080838184712334,
     "baseline_rmse": 6.811141490936279,
-    "model_rmse": 6.468710899353027,
+    "model_rmse": 6.438652038574219,
     "start_sit_pairs": 5399,
     "baseline_start_sit_acc": 0.7488423782181886,
-    "model_start_sit_acc": 0.7694017410631598,
+    "model_start_sit_acc": 0.7695869605482497,
     "start_sit_pairs_same_position": 13873,
     "baseline_start_sit_acc_same_position": 0.720175881208102,
-    "model_start_sit_acc_same_position": 0.7411518777481438
+    "model_start_sit_acc_same_position": 0.7430260217689036
+  },
+  "test": {
+    "n_player_weeks": 4325,
+    "baseline_mae": 4.842787265777588,
+    "model_mae": 4.424679279327393,
+    "mae_improvement_pct": 8.633622818925566,
+    "baseline_rmse": 6.853817462921143,
+    "model_rmse": 6.426132678985596,
+    "start_sit_pairs": 5429,
+    "baseline_start_sit_acc": 0.7581506723153435,
+    "model_start_sit_acc": 0.7811751703812857,
+    "start_sit_pairs_same_position": 14015,
+    "baseline_start_sit_acc_same_position": 0.7250089190153407,
+    "model_start_sit_acc_same_position": 0.7422047805922226
   },
   "per_position": {
     "QB": {
-      "n": 452,
-      "baseline_mae": 6.744999885559082,
-      "model_mae": 6.288727760314941
+      "n": 438,
+      "baseline_mae": 7.086073398590088,
+      "model_mae": 6.656383991241455
     },
     "RB": {
-      "n": 1106,
-      "baseline_mae": 4.795913219451904,
-      "model_mae": 4.425601959228516
+      "n": 1152,
+      "baseline_mae": 4.944965362548828,
+      "model_mae": 4.538160800933838
     },
     "WR": {
-      "n": 1775,
-      "baseline_mae": 4.964353084564209,
-      "model_mae": 4.532704830169678
+      "n": 1826,
+      "baseline_mae": 4.631132125854492,
+      "model_mae": 4.191699028015137
     },
     "TE": {
-      "n": 880,
-      "baseline_mae": 4.010378837585449,
-      "model_mae": 3.700181484222412
+      "n": 909,
+      "baseline_mae": 4.0575432777404785,
+      "model_mae": 3.6735315322875977
     }
   }
 }

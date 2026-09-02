@@ -38,6 +38,10 @@ class Snippet:
     published: str
     text: str
     source: str
+    # Absent on the undated synthetic fixture, which stays eligible for every
+    # query. Real report rows carry both and are scoped by them.
+    season: int | None = None
+    week: int | None = None
     score: float = 0.0
 
     def cite(self) -> str:
@@ -47,6 +51,27 @@ class Snippet:
         """What gets embedded. Name and team are the highest-signal terms for a
         start/sit query, so they go in rather than being left to their fields."""
         return f"{self.player} {self.team} {self.text}"
+
+
+def _eligible(
+    snippets: list[Snippet], season: int | None, week: int | None
+) -> np.ndarray:
+    """1.0 for snippets a decision in (season, week) could legitimately cite.
+
+    Same season, filed no later than that week -- citing a later report as
+    context for an earlier call is hindsight, not retrieval. Undated snippets
+    (the synthetic fixture) are always eligible; an unscoped query matches all.
+    """
+    if season is None:
+        return np.ones(len(snippets), dtype=np.float32)
+    return np.array(
+        [
+            s.season is None
+            or (s.season == season and (week is None or s.week is None or s.week <= week))
+            for s in snippets
+        ],
+        dtype=np.float32,
+    )
 
 
 class InMemoryStore:
@@ -61,10 +86,17 @@ class InMemoryStore:
             embed([s.document() for s in snippets]) if snippets else np.zeros((0, EMBED_DIM))
         )
 
-    def search(self, query: str, k: int = 4) -> list[Snippet]:
+    def search(
+        self, query: str, k: int = 4,
+        season: int | None = None, week: int | None = None,
+    ) -> list[Snippet]:
         if not self._snippets:
             return []
         scores = self._matrix @ embed([query])[0]  # rows are L2-normalised
+        # Zero out anything the asked-about week could not have seen. Without
+        # this a week 3 decision can cite a week 14 report -- the corpus spans
+        # ten seasons, and the recency tiebreak below actively prefers newest.
+        scores = scores * _eligible(self._snippets, season, week)
         # Recency breaks ties: one player's Week 3 and Week 14 reports embed
         # almost identically, so similarity alone can return a stale status.
         # lexsort orders by its last key first -- score desc, then published desc.
@@ -101,6 +133,8 @@ class PgVectorStore:
                     player     TEXT NOT NULL,
                     team       TEXT,
                     published  DATE,
+                    season     INT,
+                    week       INT,
                     source     TEXT,
                     text       TEXT NOT NULL,
                     embedding  vector({EMBED_DIM})
@@ -116,31 +150,43 @@ class PgVectorStore:
             for snippet, vec in zip(snippets, vectors):
                 cur.execute(
                     """
-                    INSERT INTO news_snippets (id, player, team, published, source, text, embedding)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO news_snippets
+                        (id, player, team, published, season, week, source, text, embedding)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (id) DO UPDATE SET
+                        season = EXCLUDED.season, week = EXCLUDED.week,
                         text = EXCLUDED.text, embedding = EXCLUDED.embedding
                     """,
                     (snippet.id, snippet.player, snippet.team, snippet.published,
-                     snippet.source, snippet.text, vec),
+                     snippet.season, snippet.week, snippet.source, snippet.text, vec),
                 )
 
-    def search(self, query: str, k: int = 4) -> list[Snippet]:
+    def search(
+        self, query: str, k: int = 4,
+        season: int | None = None, week: int | None = None,
+    ) -> list[Snippet]:
         vec = embed([query])[0]
+        # Mirrors _eligible(): same season, filed no later than the asked week,
+        # with undated fixture rows always in play.
+        where, params = "", []
+        if season is not None:
+            where = "WHERE (season IS NULL OR (season = %s AND (%s IS NULL OR week IS NULL OR week <= %s)))"
+            params = [season, week, week]
         with self._conn.cursor() as cur:
             cur.execute(
-                """
-                SELECT id, player, team, published, source, text,
+                f"""
+                SELECT id, player, team, published, season, week, source, text,
                        1 - (embedding <=> %s) AS score
                 FROM news_snippets
+                {where}
                 ORDER BY embedding <=> %s, published DESC
                 LIMIT %s
                 """,
-                (vec, vec, k),
+                (vec, *params, vec, k),
             )
             return [
                 Snippet(id=r[0], player=r[1], team=r[2], published=str(r[3]),
-                        source=r[4], text=r[5], score=float(r[6]))
+                        season=r[4], week=r[5], source=r[6], text=r[7], score=float(r[8]))
                 for r in cur.fetchall()
             ]
 

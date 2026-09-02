@@ -13,7 +13,7 @@ from typing import Protocol
 import httpx
 from fastapi import HTTPException
 
-from api.schemas import Projection
+from api.schemas import PlayerCard, Projection
 
 log = logging.getLogger(__name__)
 
@@ -22,6 +22,10 @@ class ProjectionClient(Protocol):
     mode: str
 
     def project(self, player: str, season: int | None, week: int | None) -> Projection: ...
+    def weeks(self) -> list[dict]: ...
+    def players(self, season: int | None, week: int | None) -> list[dict]: ...
+    def all_players(self) -> list[dict]: ...
+    def project_latest(self, player: str) -> PlayerCard: ...
     def health(self) -> dict: ...
 
 
@@ -59,6 +63,37 @@ class InProcessClient:
             actual=None if pw.actual is None else round(pw.actual, 1),
         )
 
+    def weeks(self) -> list[dict]:
+        return self._store.weeks()
+
+    def all_players(self) -> list[dict]:
+        return self._store.all_players()
+
+    def project_latest(self, player: str) -> PlayerCard:
+        pw = self._store.latest_player_week(player)
+        if pw is None:
+            raise HTTPException(404, f"no projectable player matching {player!r}")
+        return PlayerCard(
+            player_id=pw.player_id, name=pw.name, position=pw.position, team=pw.team,
+            opponent=pw.opponent, season=pw.season, week=pw.week,
+            projection=round(self._projector.project(pw.seq, pw.ctx), 1),
+            baseline=round(pw.baseline, 1),
+            actual=None if pw.actual is None else round(pw.actual, 1),
+            **self._store.career(pw.player_id),
+        )
+
+    def players(self, season: int | None, week: int | None) -> list[dict]:
+        df = self._store.players(
+            season or self._store.latest_season, week or self._store.latest_week
+        )
+        return df.rename(
+            columns={
+                "player_display_name": "name",
+                "recent_team": "team",
+                "opponent_team": "opponent",
+            }
+        ).to_dict("records")
+
     def health(self) -> dict:
         return {
             "val_mae": round(self._projector.val_mae, 3),
@@ -87,6 +122,34 @@ class HttpClient:
             raise HTTPException(404, response.json().get("detail", "player not found"))
         response.raise_for_status()
         return Projection(**response.json())
+
+    def weeks(self) -> list[dict]:
+        return self._get("/weeks")
+
+    def all_players(self) -> list[dict]:
+        return self._get("/players/all")
+
+    def project_latest(self, player: str) -> PlayerCard:
+        try:
+            response = self._client.post("/project/latest", json={"player": player})
+        except httpx.HTTPError as exc:
+            raise HTTPException(503, f"model service unreachable: {exc}") from exc
+        if response.status_code == 404:
+            raise HTTPException(404, response.json().get("detail", "player not found"))
+        response.raise_for_status()
+        return PlayerCard(**response.json())
+
+    def players(self, season: int | None, week: int | None) -> list[dict]:
+        params = {k: v for k, v in {"season": season, "week": week}.items() if v}
+        return self._get("/players", params=params)
+
+    def _get(self, path: str, **kwargs) -> list[dict]:
+        try:
+            response = self._client.get(path, **kwargs)
+        except httpx.HTTPError as exc:
+            raise HTTPException(503, f"model service unreachable: {exc}") from exc
+        response.raise_for_status()
+        return response.json()
 
     def health(self) -> dict:
         try:

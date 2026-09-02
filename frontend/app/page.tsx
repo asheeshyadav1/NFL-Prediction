@@ -1,170 +1,88 @@
-"use client";
-
-import { useState } from "react";
-
-// Same-origin: the ingress (in Kubernetes) or the Next rewrite in
-// next.config.ts (everywhere else) forwards this prefix to the gateway.
-const API = "/api";
-
-type Projection = {
-  player_id: string;
-  name: string;
-  position: string;
-  team: string;
-  opponent: string;
-  season: number;
-  week: number;
-  projection: number;
-  baseline: number;
-  actual: number | null;
-};
-
-type Snippet = {
-  player: string;
-  published: string;
-  source: string;
-  text: string;
-  score: number;
-};
-
-type Recommendation = {
-  players: Projection[];
-  start: string;
-  margin: number;
-  confidence: "high" | "moderate" | "low";
-  snippets: Snippet[];
-  narration: string;
-  narration_model: string;
-  narration_grounded: boolean;
-};
-
-function PlayerCard({ p, winner }: { p: Projection; winner: boolean }) {
-  const delta = p.projection - p.baseline;
-  return (
-    <div className={winner ? "card winner" : "card"}>
-      <div className="tag">{winner ? "Start" : "Sit"}</div>
-      <h2>{p.name}</h2>
-      <div className="meta">
-        {p.position} · {p.team} vs {p.opponent} · {p.season} wk {p.week}
-      </div>
-      <div className="proj">
-        {p.projection.toFixed(1)}
-        <span>projected PPR</span>
-      </div>
-      <div className="compare">
-        <span>
-          Naive last-3 baseline: {p.baseline.toFixed(1)} ({delta >= 0 ? "+" : ""}
-          {delta.toFixed(1)})
-        </span>
-        {p.actual !== null && <span>Actual: {p.actual.toFixed(1)}</span>}
-      </div>
-    </div>
-  );
-}
+import { Console } from "./components/Console";
+import { FieldCanvas } from "./components/FieldCanvas";
+import { Go, TopBar } from "./components/Nav";
+import { Plays } from "./components/Plays";
+import { Scoreboard } from "./components/Scoreboard";
+import { Splash } from "./components/Splash";
 
 export default function Page() {
-  const [playerA, setPlayerA] = useState("Mark Andrews");
-  const [playerB, setPlayerB] = useState("Brock Bowers");
-  const [result, setResult] = useState<Recommendation | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function compare(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    try {
-      const res = await fetch(`${API}/recommend`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player_a: playerA, player_b: playerB }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.detail ?? `request failed (${res.status})`);
-      setResult(body as Recommendation);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const winner = result?.players.find((p) => p.name === result.start);
-
   return (
-    <main>
-      <header>
-        <h1>Fantasy Football Toolkit</h1>
-        <p>
-          The projection comes from a trained sequence model — not from the
-          language model. The LLM only explains the number, grounded in
-          retrieved news. Numbers below are for a completed week, so the actual
-          result is shown alongside for honesty.
-        </p>
-      </header>
+    <>
+      <Splash />
+      <TopBar />
 
-      <form onSubmit={compare}>
-        <div>
-          <label htmlFor="a">Player A</label>
-          <input id="a" value={playerA} onChange={(e) => setPlayerA(e.target.value)} />
-        </div>
-        <div>
-          <label htmlFor="b">Player B</label>
-          <input id="b" value={playerB} onChange={(e) => setPlayerB(e.target.value)} />
-        </div>
-        <button type="submit" disabled={loading}>
-          {loading ? "Projecting…" : "Compare"}
-        </button>
-      </form>
-
-      {error && <div className="error">{error}</div>}
-
-      {result && winner && (
-        <>
-          <div className="cards">
-            {result.players.map((p) => (
-              <PlayerCard key={p.player_id} p={p} winner={p.name === result.start} />
-            ))}
-          </div>
-
-          <div className="panel">
-            <h3>
-              Recommendation · {result.margin.toFixed(1)}-point edge ·{" "}
-              {result.confidence} confidence
-            </h3>
-            <div className="narration">{result.narration}</div>
-            <div className="footnote">
-              Narrated by {result.narration_model}.
-              {result.narration_grounded
-                ? " Quoted projections verified against the model output."
-                : ""}
+      <main id="view-home">
+        <div className="hero">
+          <FieldCanvas />
+          <div className="wrap">
+            <p className="kicker">
+              Start / sit, settled · <b>2025 season</b>
+            </p>
+            <h1>
+              Who do <span className="out">I</span> start?
+            </h1>
+            <p className="sub">
+              Two players. One lineup spot. Kickoff in an hour and everyone on the
+              internet has a different answer. <b>Pick both. Get one.</b>
+            </p>
+            <div className="hero-cta">
+              <Go to="app">Set your lineup</Go>
+              <Go to="how" className="btn ghost">
+                How it calls it
+              </Go>
             </div>
-            {!result.narration_grounded && (
-              <div className="warnbar">
-                Warning: the narration did not quote the model&apos;s projected
-                totals verbatim — treat the prose, not the numbers, as suspect.
-              </div>
-            )}
           </div>
+        </div>
 
-          <div className="panel">
-            <h3>Retrieved context ({result.snippets.length})</h3>
-            {result.snippets.length === 0 && (
-              <div className="snippet">Nothing relevant was retrieved.</div>
-            )}
-            {result.snippets.map((s, i) => (
-              <div className="snippet" key={i}>
-                <div className="src">
-                  {s.player} · {s.source} · {s.published} · similarity{" "}
-                  {s.score.toFixed(2)}
-                </div>
-                {s.text}
-              </div>
-            ))}
+        <Scoreboard />
+
+        <section id="how">
+          <div className="wrap">
+            <p className="eyebrow">The play</p>
+            <h2>Three steps, in that order</h2>
+            <p className="lead">
+              The order matters more than it sounds. Each step is walled off from the
+              one before it, so nothing downstream can quietly talk the number into
+              something friendlier.
+            </p>
+            <Plays />
           </div>
-        </>
-      )}
-    </main>
+        </section>
+
+        <div className="band">
+          <section>
+            <div className="wrap">
+              <blockquote>
+                The model does the math. The writer just <em>explains</em> it.
+              </blockquote>
+              <p>
+                Anything that can write you a confident paragraph can write you a
+                confident number too. Here they are different things, and only one of
+                them is allowed near your lineup.
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <section>
+          <div className="wrap">
+            <p className="eyebrow">No takebacks</p>
+            <h2>Every call gets graded</h2>
+            <p className="lead">
+              These are completed games, so the truth is already on record. Every
+              recommendation shows you what actually happened afterwards, including
+              the ones it got wrong. A projection you cannot check is just a vibe with
+              a decimal point.
+            </p>
+            <div className="hero-cta">
+              <Go to="app">Pick a matchup</Go>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <Console />
+
+    </>
   );
 }

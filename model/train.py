@@ -47,14 +47,17 @@ def predict(model: nn.Module, seq: np.ndarray, ctx: np.ndarray, batch: int = 102
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--first-season", type=int, default=2016)
-    ap.add_argument("--val-season", type=int, default=2023)
-    ap.add_argument("--test-season", type=int, default=2024)
+    ap.add_argument("--val-season", type=int, default=2024)
+    ap.add_argument("--test-season", type=int, default=2025)
     ap.add_argument("--epochs", type=int, default=60)
     ap.add_argument("--patience", type=int, default=8)
     ap.add_argument("--batch-size", type=int, default=256)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--hidden", type=int, default=64)
     ap.add_argument("--seed", type=int, default=17)
+    # 0 reproduces the original non-negative model; see results.json to compare.
+    ap.add_argument("--floor", type=float, default=0.0,
+                    help="how far below zero a projection may go")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -87,7 +90,9 @@ def main() -> None:
         PlayerWeeks(tr_seq, tr_ctx, train_w["y"]),
         batch_size=args.batch_size, shuffle=True, drop_last=True,
     )
-    model = ProjectionNet(len(SEQ_STATS), len(CONTEXT_FEATURES), hidden=args.hidden)
+    model = ProjectionNet(
+        len(SEQ_STATS), len(CONTEXT_FEATURES), hidden=args.hidden, floor=args.floor
+    )
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
     # L1 matches the headline MAE and resists the long right tail better than MSE.
     loss_fn = nn.L1Loss()
@@ -119,6 +124,7 @@ def main() -> None:
                     "ctx_features": CONTEXT_FEATURES,
                     "seq_len": SEQ_LEN,
                     "hidden": args.hidden,
+                    "floor": args.floor,
                     "val_season": args.val_season,
                     "val_mae": val_mae,
                 },
@@ -146,6 +152,7 @@ def main() -> None:
         "val_season": args.val_season,
         "train_seasons": [args.first_season, args.val_season - 1],
         "seed": args.seed,
+        "floor": args.floor,
         "best_epoch": best_epoch,
         "val": evaluate.compare(val_w["frame"], val_w["y"], val_pred, val_w["baseline"]),
         "test": evaluate.compare(test_w["frame"], test_w["y"], test_pred, test_w["baseline"]),

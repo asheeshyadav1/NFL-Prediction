@@ -162,3 +162,52 @@ def test_rows_without_enough_history_are_dropped(frame: pd.DataFrame) -> None:
     assert (w["frame"]["games_played"] >= MIN_HISTORY).all()
     assert w["seq"].shape[1] == SEQ_LEN
     assert not np.isnan(w["baseline"]).any()
+
+
+# --- retrieval is scoped to the week being decided -------------------------
+#
+# The corpus spans every season the app can serve, so an unscoped query can
+# hand the narrator a report filed after the game it is explaining. That is
+# hindsight reaching the user as "context", which is the same class of error
+# the window tests above exist to prevent.
+
+def _store():
+    from api import rag
+
+    return rag.InMemoryStore(
+        [
+            rag.Snippet(id="a", player="Davante Adams", team="GB", published="2019-10-20",
+                        season=2019, week=7, source="NFL-INJURY-REPORT",
+                        text="Davante Adams is listed as Out with a toe injury."),
+            rag.Snippet(id="b", player="Davante Adams", team="GB", published="2019-12-15",
+                        season=2019, week=15, source="NFL-INJURY-REPORT",
+                        text="Davante Adams is listed as Questionable with a toe injury."),
+            rag.Snippet(id="c", player="Davante Adams", team="LV", published="2024-10-20",
+                        season=2024, week=7, source="NFL-INJURY-REPORT",
+                        text="Davante Adams is listed as Out with a hamstring injury."),
+            rag.Snippet(id="d", player="Davante Adams", team="GB", published="2019-01-01",
+                        source="SYNTHETIC-DEMO", text="Davante Adams demo fixture line."),
+        ]
+    )
+
+
+def test_retrieval_never_cites_a_later_week() -> None:
+    hits = _store().search("Davante Adams GB injury status outlook", k=4, season=2019, week=8)
+    weeks = {h.week for h in hits if h.season is not None}
+    assert weeks == {7}, f"expected only week <= 8 of 2019, got {weeks}"
+
+
+def test_retrieval_never_cites_another_season() -> None:
+    hits = _store().search("Davante Adams injury status outlook", k=4, season=2019, week=18)
+    seasons = {h.season for h in hits if h.season is not None}
+    assert seasons == {2019}, f"cross-season citation leaked: {seasons}"
+
+
+def test_undated_fixture_stays_eligible() -> None:
+    hits = _store().search("Davante Adams GB injury status outlook", k=4, season=2019, week=8)
+    assert "d" in {h.id for h in hits}, "undated demo fixture should remain retrievable"
+
+
+def test_unscoped_search_still_returns_everything() -> None:
+    hits = _store().search("Davante Adams injury status outlook", k=4)
+    assert len(hits) == 4, "an unscoped query must keep its previous behaviour"

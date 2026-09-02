@@ -31,6 +31,8 @@ class Projector:
             n_seq_features=len(ckpt["seq_features"]),
             n_ctx_features=len(ckpt["ctx_features"]),
             hidden=ckpt["hidden"],
+            # Older checkpoints predate the floor and were all non-negative.
+            floor=ckpt.get("floor", 0.0),
         )
         self.model.load_state_dict(ckpt["state_dict"])
         self.model.eval()

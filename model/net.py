@@ -19,8 +19,13 @@ class ProjectionNet(nn.Module):
         hidden: int = 64,
         layers: int = 1,
         dropout: float = 0.2,
+        floor: float = 0.0,
     ) -> None:
         super().__init__()
+        # How far below zero the output may go. PPR scores turnovers at -2 a
+        # piece, so a real week can finish negative; a plain softplus (floor=0)
+        # cannot represent that at all.
+        self.floor = float(floor)
         self.lstm = nn.LSTM(
             input_size=n_seq_features,
             hidden_size=hidden,
@@ -39,5 +44,6 @@ class ProjectionNet(nn.Module):
     def forward(self, seq: torch.Tensor, ctx: torch.Tensor) -> torch.Tensor:
         _, (h_n, _) = self.lstm(seq)
         out = self.head(torch.cat([h_n[-1], ctx], dim=1)).squeeze(-1)
-        # Points floor near zero; softplus avoids hard-clipping the gradient.
-        return nn.functional.softplus(out)
+        # Softplus keeps the soft asymptote (no hard-clipped gradient) while
+        # `floor` slides it down to where real scores actually bottom out.
+        return nn.functional.softplus(out) - self.floor

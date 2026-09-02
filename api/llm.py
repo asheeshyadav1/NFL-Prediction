@@ -36,7 +36,7 @@ projected player, say), surface that tension explicitly. The projection still \
 stands; the reader deserves to know the risk.
 
 Write 2-4 sentences. Open with the recommendation. Plain prose, no headings, no \
-bullet points."""
+bullet points. Never use em dashes; use a comma, colon or full stop instead."""
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,7 @@ def _template(a: dict, b: dict, snippets: list[str]) -> str:
         f"Start {hi['name']} over {lo['name']}. The model projects "
         f"{hi['projection']:.1f} PPR points for {hi['name']} against "
         f"{hi['opponent']}, versus {lo['projection']:.1f} for {lo['name']} "
-        f"against {lo['opponent']} -- a {margin:.1f}-point edge, which is "
+        f"against {lo['opponent']}, a {margin:.1f}-point edge, which is "
         f"{confidence}."
     ]
     if snippets:
@@ -85,6 +85,21 @@ def _completed(response) -> bool:
         return False
     reason = getattr(candidates[0], "finish_reason", None)
     return reason is None or str(reason).endswith("STOP")
+
+
+def _no_em_dashes(text: str) -> str:
+    """Punctuation-only cleanup of narrator prose.
+
+    The system prompt asks for no em dashes, but a prompt is a request rather
+    than a guarantee. Runs before _verify, and touches no digits, so it cannot
+    disturb the grounding check.
+    """
+    return (
+        text.replace(" — ", ", ")
+        .replace(" – ", ", ")
+        .replace("—", ", ")
+        .replace("–", ", ")
+    )
 
 
 def narrate(player_a: dict, player_b: dict, snippets: list[str]) -> Narration:
@@ -144,6 +159,7 @@ Which should the manager start, and why?"""
             grounded=True,
         )
 
+    text = _no_em_dashes(text)
     grounded = _verify(text, [player_a, player_b])
     if not grounded:
         log.warning("narration did not quote the projected totals verbatim")
