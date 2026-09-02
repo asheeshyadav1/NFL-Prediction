@@ -2,19 +2,24 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-// Same-origin: the ingress (in Kubernetes) or app/api/[...path]/route.ts
-// (everywhere else) forwards this prefix to the gateway.
-const API = "/api";
+import {
+  compare as compareStatic,
+  getAllPlayers,
+  getSlate,
+  getWeeks,
+  recommend as recommendStatic,
+} from "../lib/data";
+import type {
+  AllPlayer,
+  PlayerCard as Card,
+  Recommendation,
+  Snippet,
+  SlateRow,
+  Week,
+} from "../lib/data";
 
-type Week = {
-  season: number;
-  week: number;
-  player_weeks: number;
-  // False for a week that is scheduled but has no box scores yet. `opens` is
-  // the date its first game kicks off.
-  playable?: boolean;
-  opens?: string | null;
-};
+type Player = SlateRow;
+type Mode = "week" | "player";
 
 const isPlayable = (w: Week) => w.playable !== false;
 
@@ -30,67 +35,6 @@ function openLabel(iso: string | null | undefined): string {
   return month && d ? `opens ${month} ${d}` : "";
 }
 
-type Player = {
-  player_id: string;
-  name: string;
-  position: string;
-  team: string;
-  opponent: string;
-};
-
-type Projection = {
-  player_id: string;
-  name: string;
-  position: string;
-  team: string;
-  opponent: string;
-  season: number;
-  week: number;
-  projection: number;
-  baseline: number;
-  actual: number | null;
-};
-
-// The compare view returns a projection plus career shape; the weekly view
-// returns the projection alone. One type covers both.
-type Card = Projection & {
-  career_games?: number;
-  career_avg?: number;
-  last6_avg?: number;
-};
-
-type AllPlayer = {
-  player_id: string;
-  name: string;
-  position: string;
-  team: string;
-  last_season: number;
-  last_week: number;
-  career_games: number;
-  career_avg: number;
-};
-
-type Mode = "week" | "player";
-
-type Snippet = {
-  player: string;
-  published: string;
-  source: string;
-  text: string;
-  score: number;
-};
-
-type Recommendation = {
-  players: Card[];
-  start: string;
-  margin: number;
-  confidence: "high" | "moderate" | "low";
-  snippets: Snippet[];
-  narration: string;
-  narration_model: string;
-  narration_grounded: boolean;
-};
-
 const POSORD: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3 };
 const POSLABEL: Record<string, string> = {
   QB: "Quarterbacks",
@@ -103,13 +47,6 @@ const OPENER = ["Ja'Marr Chase", "Justin Jefferson"];
 
 function signed(x: number): string {
   return (x >= 0 ? "+" : "−") + Math.abs(x).toFixed(1);
-}
-
-async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${API}${path}`, { cache: "no-store" });
-  const body = await res.json();
-  if (!res.ok) throw new Error(body?.detail ?? `request failed (${res.status})`);
-  return body as T;
 }
 
 function Side({ p, start, peak }: { p: Card; start: boolean; peak: number }) {
@@ -184,7 +121,7 @@ function Cite({ s }: { s: Snippet }) {
   );
 }
 
-function Truth({ hi, lo }: { hi: Projection; lo: Projection }) {
+function Truth({ hi, lo }: { hi: Card; lo: Card }) {
   // Completed games only. An upcoming week has no truth to show yet.
   if (hi.actual === null || lo.actual === null) {
     return (
@@ -237,7 +174,7 @@ export function Console() {
   const [result, setResult] = useState<Recommendation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [note, setNote] = useState("Waking the model service");
+  const [note, setNote] = useState("Loading the season");
   // "Surprise me" spans up to three renders -- new week, new slate, new pair --
   // so its intent is carried in refs rather than re-derived from state.
   const pending = useRef<{ a: string; b: string } | null>(null);
@@ -260,7 +197,7 @@ export function Console() {
   }, [weeks]);
 
   useEffect(() => {
-    getJSON<Week[]>("/weeks")
+    getWeeks()
       .then((all) => {
         if (all.length === 0) throw new Error("the model service has no weeks to offer");
         setWeeks(all);
@@ -282,7 +219,7 @@ export function Console() {
     if (!selected) return;
     let stale = false;
     setNote("Loading the slate");
-    getJSON<Player[]>(`/players?season=${selected.season}&week=${selected.week}`)
+    getSlate(selected.season, selected.week)
       .then((list) => {
         if (stale) return;
         const sorted = [...list].sort(
@@ -319,7 +256,7 @@ export function Console() {
   // far larger than a single week's slate and the weekly view never needs it.
   useEffect(() => {
     if (mode !== "player" || allPlayers.length > 0) return;
-    getJSON<AllPlayer[]>("/players/all")
+    getAllPlayers()
       .then((list) => {
         setAllPlayers(list);
         setError(null);
@@ -333,17 +270,10 @@ export function Console() {
   const compare = useCallback(async (x: string, y: string) => {
     setLoading(true);
     setError(null);
-    setNote("Projecting both, retrieving, narrating");
+    setNote("Reading both projections, retrieving, narrating");
     const t0 = performance.now();
     try {
-      const res = await fetch(`${API}/compare`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player_a: x, player_b: y }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.detail ?? `request failed (${res.status})`);
-      setResult(body as Recommendation);
+      setResult(await compareStatic(x, y));
       setNote(`Compared in ${Math.round(performance.now() - t0)} ms`);
     } catch (err) {
       setResult(null);
@@ -358,22 +288,10 @@ export function Console() {
     async (playerA: string, playerB: string, season: number, week: number) => {
       setLoading(true);
       setError(null);
-      setNote("Projecting, retrieving, narrating");
+      setNote("Reading the projection, retrieving, narrating");
       const t0 = performance.now();
       try {
-        const res = await fetch(`${API}/recommend`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            player_a: playerA,
-            player_b: playerB,
-            season,
-            week,
-          }),
-        });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body?.detail ?? `request failed (${res.status})`);
-        setResult(body as Recommendation);
+        setResult(await recommendStatic(season, week, playerA, playerB));
         setNote(`Called in ${Math.round(performance.now() - t0)} ms`);
       } catch (err) {
         setResult(null);
