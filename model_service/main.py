@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException
 
 from api.feature_store import FeatureStore
 from api.inference import Projector
-from api.schemas import ProjectRequest, Projection
+from api.schemas import PlayerCard, ProjectRequest, Projection
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("model-service")
@@ -63,6 +63,27 @@ def players(season: int | None = None, week: int | None = None,
             "opponent_team": "opponent",
         }
     ).to_dict("records")
+
+
+@app.get("/players/all")
+def all_players() -> list[dict]:
+    return state["store"].all_players()
+
+
+@app.post("/project/latest", response_model=PlayerCard)
+def project_latest(req: dict) -> PlayerCard:
+    store: FeatureStore = state["store"]
+    pw = store.latest_player_week(req["player"])
+    if pw is None:
+        raise HTTPException(404, f"no projectable player matching {req['player']!r}")
+    return PlayerCard(
+        player_id=pw.player_id, name=pw.name, position=pw.position, team=pw.team,
+        opponent=pw.opponent, season=pw.season, week=pw.week,
+        projection=round(state["projector"].project(pw.seq, pw.ctx), 1),
+        baseline=round(pw.baseline, 1),
+        actual=None if pw.actual is None else round(pw.actual, 1),
+        **store.career(pw.player_id),
+    )
 
 
 @app.post("/project", response_model=Projection)

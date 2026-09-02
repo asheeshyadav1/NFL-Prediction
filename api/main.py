@@ -17,6 +17,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import llm, rag
 from api.projection_client import build_client
 from api.schemas import (
+    Comparison,
+    CompareRequest,
+    PlayerCard,
     ProjectRequest,
     Projection,
     Recommendation,
@@ -78,17 +81,36 @@ def health(response: Response) -> dict:
     }
 
 
+@app.get("/weeks")
+def weeks() -> list[dict]:
+    """Every projectable season/week, so the UI can offer a week picker."""
+    return state["projections"].weeks()
+
+
+@app.get("/players")
+def players(season: int | None = None, week: int | None = None) -> list[dict]:
+    """The slate for one week: who can be projected, and against whom."""
+    return state["projections"].players(season, week)
+
+
+@app.get("/players/all")
+def all_players() -> list[dict]:
+    """One row per player ever projectable, for the compare view's pickers."""
+    return state["projections"].all_players()
+
+
 @app.post("/project", response_model=Projection)
 def project(req: ProjectRequest) -> Projection:
     """The model's number. No retrieval, no LLM."""
     return state["projections"].project(req.player, req.season, req.week)
 
 
-@app.post("/recommend", response_model=Recommendation)
-def recommend(req: RecommendRequest) -> Recommendation:
-    client = state["projections"]
-    a = client.project(req.player_a, req.season, req.week)
-    b = client.project(req.player_b, req.season, req.week)
+def _decide(a: Projection, b: Projection) -> dict:
+    """Everything downstream of the two projections.
+
+    Shared by /recommend and /compare so the decision rule, the retrieval scope
+    and the grounding check cannot drift apart between the two views.
+    """
     if a.player_id == b.player_id:
         raise HTTPException(400, "pick two different players")
 
@@ -101,7 +123,12 @@ def recommend(req: RecommendRequest) -> Recommendation:
     seen: set[str] = set()
     for player in (a, b):
         for snippet in state["rag"].search(
-            f"{player.name} {player.team} injury status outlook", k=2
+            f"{player.name} {player.team} injury status outlook",
+            k=2,
+            # Scoped to the week being decided: context filed after kickoff is
+            # hindsight, and the corpus spans every season the app can serve.
+            season=player.season,
+            week=player.week,
         ):
             if snippet.id not in seen:
                 seen.add(snippet.id)
@@ -110,17 +137,38 @@ def recommend(req: RecommendRequest) -> Recommendation:
 
     narration = llm.narrate(a.model_dump(), b.model_dump(), [s.cite() for s in snippets])
 
-    return Recommendation(
-        players=[a, b],
-        start=hi.name,
-        margin=margin,
-        confidence=_confidence(margin),
-        snippets=[
+    return {
+        "start": hi.name,
+        "margin": margin,
+        "confidence": _confidence(margin),
+        "snippets": [
             {"player": s.player, "published": s.published, "source": s.source,
              "text": s.text, "score": round(s.score, 3)}
             for s in snippets
         ],
-        narration=narration.text,
-        narration_model=narration.model,
-        narration_grounded=narration.grounded,
-    )
+        "narration": narration.text,
+        "narration_model": narration.model,
+        "narration_grounded": narration.grounded,
+    }
+
+
+@app.post("/recommend", response_model=Recommendation)
+def recommend(req: RecommendRequest) -> Recommendation:
+    client = state["projections"]
+    a = client.project(req.player_a, req.season, req.week)
+    b = client.project(req.player_b, req.season, req.week)
+    return Recommendation(players=[a, b], **_decide(a, b))
+
+
+@app.post("/compare", response_model=Comparison)
+def compare(req: CompareRequest) -> Comparison:
+    """Two players, no week given.
+
+    Each is projected for his own most recent game, so the comparison reflects
+    current form rather than a decade-flat average -- and because that game has
+    been played, the real result comes back with it.
+    """
+    client = state["projections"]
+    a = client.project_latest(req.player_a)
+    b = client.project_latest(req.player_b)
+    return Comparison(players=[a, b], **_decide(a, b))
