@@ -1,0 +1,11 @@
+{
+  "val_mae": 4.514986991882324,
+  "seasons": [
+    2016,
+    2025
+  ],
+  "player_weeks": 51062,
+  "players": 1445,
+  "snippets": 9949,
+  "note": "Projections precomputed by model/artifacts/projection_net.pt. Regenerate with scripts/export_static.py after retraining."
+}

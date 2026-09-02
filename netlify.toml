@@ -1,6 +1,7 @@
-# Frontend only. The Python backend cannot run here (Netlify Functions are
-# JS/TS and Go, and torch alone exceeds the bundle limit), so app/api/[...path]
-# proxies to the Render service named in API_URL.
+# The whole site. There is no backend: scripts/export_static.py precomputes
+# every projection and its retrieved context into public/data, so the only
+# server-side code left is the narrator, which is one fetch and runs as a
+# function.
 
 [build]
   base = "frontend"

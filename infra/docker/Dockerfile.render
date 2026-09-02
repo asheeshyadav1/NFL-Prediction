@@ -33,7 +33,7 @@ load_weekly(years); load_schedules(years)"
 RUN useradd --create-home --uid 10001 app && chown -R app:app /app
 USER app
 
-# Render supplies $PORT; default matches the other images for local runs.
+# Render and Fly both supply $PORT; the default matches the other images.
 ENV PORT=8000
 EXPOSE 8000
 CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT}"]

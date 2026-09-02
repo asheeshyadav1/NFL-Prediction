@@ -1,0 +1,39 @@
+# Backend on Fly.io. The frontend is on Netlify and reaches this through the
+# app/api/[...path] proxy, so this service is never called cross-origin by a
+# browser and needs no CORS configuration.
+#
+# Alternative to render.yaml, which describes the same container. Fly is here
+# because it can be driven entirely from the CLI; Render needs the dashboard.
+
+app = "fourth-and-goal-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "infra/docker/Dockerfile.render"
+
+[env]
+  PORT = "8000"
+  GEMINI_MODEL = "gemini-3.6-flash"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  # The feature store builds ~51k player-weeks at boot, so a cold start is slow
+  # and a scaled-to-zero machine would make the first request time out. Keep one
+  # warm rather than paying that on every visit.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "120s"
+    interval = "30s"
+    timeout = "10s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  # torch plus the feature store does not fit in the 256MB default.
+  memory = "2gb"
+  cpu_kind = "shared"
+  cpus = 1
