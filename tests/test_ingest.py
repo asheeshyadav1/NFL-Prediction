@@ -126,3 +126,82 @@ def test_recency_breaks_similarity_ties():
     store = rag.InMemoryStore([snippet("old", "2024-11-03"), snippet("new", "2025-11-02")])
     [top, _] = store.search("Test Player BAL injury status outlook", k=2)
     assert top.id == "new"
+
+
+# --- preseason ingest ------------------------------------------------------
+#
+# Before week 1 there are no box scores and no injury report. These cover the
+# feeds that do exist, and the status codes the report spells out rather than
+# repeats raw.
+
+from datetime import date  # noqa: E402
+
+import ingest_preseason as pre  # noqa: E402
+
+
+def _chart_row(**over):
+    row = {"player_name": "Trey McBride", "team": "ARI", "pos_abb": "TE",
+           "pos_rank": 1, "week": 1, "season": 2026}
+    row.update(over)
+    return pd.Series(row)
+
+
+def test_depth_chart_row_reads_as_a_sentence():
+    text = pre.describe(_chart_row(), "ACT")
+    assert "first-string TE on ARI's depth chart" in text
+    assert "week 1 of the 2026 season" in text
+    assert "on the active roster" in text
+
+
+def test_reserve_status_is_spelled_out_not_left_as_a_code():
+    text = pre.describe(_chart_row(), "RES")
+    assert "RES" not in text, "raw status code leaked into prose"
+    assert "reserve" in text and "unavailable" in text
+
+
+def test_unknown_status_code_is_reported_verbatim_not_guessed():
+    text = pre.describe(_chart_row(), "ZZZ")
+    assert "Roster status: ZZZ." in text
+
+
+def test_preseason_snippet_says_no_games_have_been_played():
+    # The narrator must not present camp positioning as in-season form.
+    assert "No games have been played yet" in pre.describe(_chart_row(), "ACT")
+
+
+def test_missing_rank_does_not_produce_a_broken_sentence():
+    text = pre.describe(_chart_row(pos_rank=float("nan")), None)
+    assert "None" not in text and "nan" not in text
+
+
+# --- refresh scheduling ----------------------------------------------------
+
+import refresh  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "today, expected",
+    [
+        (date(2026, 9, 1), 2026),   # camp: the 2026 season is the one coming
+        (date(2026, 12, 20), 2026),  # in season
+        (date(2027, 1, 15), 2026),   # January still belongs to 2026
+        (date(2027, 2, 8), 2026),    # so does the Super Bowl
+        (date(2027, 3, 1), 2027),    # new league year
+    ],
+)
+def test_current_season_rolls_over_in_march_not_january(today, expected):
+    assert refresh.current_season(today) == expected
+
+
+def test_refresh_only_drops_the_season_it_was_asked_about(tmp_path, monkeypatch):
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    for name in ("weekly_2024.parquet", "weekly_2026.parquet", "injuries_2026.parquet"):
+        (raw / name).write_bytes(b"x")
+    monkeypatch.setattr(refresh, "RAW", raw)
+
+    refresh.drop_cache(2026)
+
+    assert (raw / "weekly_2024.parquet").exists(), "a completed season was re-downloaded"
+    assert not (raw / "weekly_2026.parquet").exists()
+    assert not (raw / "injuries_2026.parquet").exists()

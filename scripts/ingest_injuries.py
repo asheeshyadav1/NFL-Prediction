@@ -125,6 +125,11 @@ def build_snippets(injuries: pd.DataFrame, schedules: pd.DataFrame) -> list[dict
             "player": r["full_name"],
             "team": r["team"],
             "published": r["published"],
+            # Carried explicitly so retrieval can scope to the week being asked
+            # about. `published` alone cannot: it is a date, and the corpus now
+            # spans ten seasons of them.
+            "season": int(r["season"]),
+            "week": int(r["week"]),
             "source": SOURCE,
             "text": describe(r),
         }
@@ -178,7 +183,7 @@ def main() -> int:
             "game-status report published at nfl.com/injuries). Regenerate rather "
             "than hand-editing."
         ),
-        "_schema": "id, player, team, published, source, text",
+        "_schema": "id, player, team, published, season, week, source, text",
         "_source_label": f"Every entry carries source = '{SOURCE}'.",
         "snippets": snippets,
     }, indent=2) + "\n")
