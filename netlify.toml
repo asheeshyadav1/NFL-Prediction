@@ -5,7 +5,9 @@
 [build]
   base = "frontend"
   command = "npm run build"
-  publish = ".next"
+  # Relative to the repo root, not to `base` -- ".next" alone resolves to
+  # <root>/.next and the build fails with "publish directory was not found".
+  publish = "frontend/.next"
 
 [build.environment]
   NODE_VERSION = "22"

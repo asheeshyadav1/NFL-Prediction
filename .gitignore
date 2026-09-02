@@ -11,3 +11,6 @@ node_modules/
 .env
 .pytest_cache/
 *.tsbuildinfo
+
+# Local Netlify folder
+.netlify
