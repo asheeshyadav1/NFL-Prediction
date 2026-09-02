@@ -18,14 +18,29 @@ log = logging.getLogger(__name__)
 
 CACHE_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
 
-_RELEASE = "https://github.com/nflverse/nflverse-data/releases/download/player_stats"
-# nflverse renamed these assets partway through; a few seasons (2019 at time of
-# writing) only exist under the legacy name, so try both.
+# nflverse moved weekly player stats out of the `player_stats` release and into
+# `stats_player`. The old release is frozen at 2024, so the current release has
+# to be tried first or every season from 2025 on silently looks unavailable.
+_RELEASE = "https://github.com/nflverse/nflverse-data/releases/download/stats_player"
+_LEGACY_RELEASE = "https://github.com/nflverse/nflverse-data/releases/download/player_stats"
+# Names churned twice; a few seasons (2019 at time of writing) only exist under
+# the oldest one, so try each in turn.
 WEEKLY_URLS = (
     _RELEASE + "/stats_player_week_{year}.parquet",
-    _RELEASE + "/player_stats_{year}.parquet",
+    _LEGACY_RELEASE + "/stats_player_week_{year}.parquet",
+    _LEGACY_RELEASE + "/player_stats_{year}.parquet",
 )
 GAMES_URL = "http://www.habitatring.com/games.csv"
+
+# Preseason signal. Before week 1 there are no box scores and no injury report,
+# but both of these exist and move: the depth chart is re-snapshotted through
+# camp, and the weekly roster carries cut/reserve/active status.
+DEPTH_CHARTS_URL = (
+    "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_{year}.parquet"
+)
+ROSTERS_URL = (
+    "https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/roster_weekly_{year}.parquet"
+)
 
 # The official NFL injury report (the nfl.com/injuries data), mirrored by
 # nflverse. More stable than that page's token-gated API, and it carries gsis_id.
@@ -71,22 +86,42 @@ def _download_first(urls: tuple[str, ...], **fmt) -> bytes:
 
 
 def load_weekly(years: list[int]) -> pd.DataFrame:
-    """Per-player, per-week box scores including precomputed PPR points."""
+    """Per-player, per-week box scores including precomputed PPR points.
+
+    A season with no release yet is skipped with a warning rather than raising,
+    so a range that runs into the current season works before week 1. The
+    seasons actually loaded are logged -- never assume you got what you asked
+    for, check the range in the log.
+    """
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     frames = []
+    missing = []
     for year in years:
         path = CACHE_DIR / f"weekly_{year}.parquet"
         if not path.exists():
-            path.write_bytes(_download_first(WEEKLY_URLS, year=year))
+            try:
+                path.write_bytes(_download_first(WEEKLY_URLS, year=year))
+            except RuntimeError:
+                log.warning("no weekly release for %s yet -- skipping", year)
+                missing.append(year)
+                continue
         season = pd.read_parquet(path)
         season = season.rename(
             columns={k: v for k, v in COLUMN_ALIASES.items() if k in season.columns}
         )
         frames.append(season)
 
+    if not frames:
+        raise RuntimeError(f"no weekly data available for any of {years}")
+
     df = pd.concat(frames, ignore_index=True)
     df = df[df["season_type"] == "REG"]
     df = df[df["position"].isin(POSITIONS)]
+    log.info(
+        "weekly: %s rows, seasons %s-%s%s",
+        f"{len(df):,}", df["season"].min(), df["season"].max(),
+        f" (unavailable: {missing})" if missing else "",
+    )
     return df.reset_index(drop=True)
 
 
@@ -122,6 +157,38 @@ def load_injuries(years: list[int]) -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
+def _load_optional(url: str, cache_name: str, years: list[int], label: str) -> pd.DataFrame:
+    """Per-season parquet that may not exist yet, concatenated.
+
+    Used for the in-season feeds. A season with no release is skipped, so a
+    range that runs past today is normal rather than fatal.
+    """
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    frames = []
+    for year in years:
+        path = CACHE_DIR / f"{cache_name}_{year}.parquet"
+        if not path.exists():
+            try:
+                path.write_bytes(_download(url.format(year=year)))
+            except urllib.error.HTTPError as exc:
+                log.warning("no %s release for %s (%s) -- skipping", label, year, exc.code)
+                continue
+        frames.append(pd.read_parquet(path))
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def load_depth_charts(years: list[int]) -> pd.DataFrame:
+    """Team depth charts, re-snapshotted through the offseason and season."""
+    return _load_optional(DEPTH_CHARTS_URL, "depth_charts", years, "depth chart")
+
+
+def load_rosters(years: list[int]) -> pd.DataFrame:
+    """Weekly rosters, carrying active/reserve/cut status per player."""
+    return _load_optional(ROSTERS_URL, "rosters", years, "roster")
+
+
 def load_schedules(years: list[int]) -> pd.DataFrame:
     """Game-level schedule, used for home/away and rest days."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -138,7 +205,7 @@ def load_schedules(years: list[int]) -> pd.DataFrame:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    years = list(range(2016, 2025))
+    years = list(range(2016, 2026))
     w = load_weekly(years)
     s = load_schedules(years)
     i = load_injuries(years)
