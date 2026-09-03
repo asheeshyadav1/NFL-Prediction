@@ -1,4 +1,4 @@
-# Fantasy Football Toolkit — Projections That Explain Themselves
+# Fantasy Football Toolkit: Projections That Explain Themselves
 
 ## What this is
 
@@ -91,7 +91,7 @@ than relying on the ranking to prefer the current week.
 
 ### Configuration
 
-Everything is optional — the service runs fully without any of it.
+Everything is optional, the service runs fully without any of it.
 
 | Variable | Unset behaviour |
 |---|---|
